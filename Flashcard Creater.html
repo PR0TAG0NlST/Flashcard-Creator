@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Base styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* For the card flip animation */
+        .scene {
+            perspective: 1000px;
+        }
+
+        .card {
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .card-face-back {
+            transform: rotateY(180deg);
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-50 dark:bg-slate-900 overflow-hidden">
+
+    <!-- App Root -->
+    <div id="app-root" class="h-full">
+        <!-- This div will be populated by JavaScript -->
+    </div>
+
+    <!-- Firebase and App Logic -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
+        const firebaseConfig = {
+	  apiKey: "AIzaSyDv0HUX80zaG27ECTBpQNQQGzQA88cqrGw",
+  	  authDomain: "flashcard-generator-by-protag.firebaseapp.com",
+  	  projectId: "flashcard-generator-by-protag",
+  	  storageBucket: "flashcard-generator-by-protag.firebasestorage.app",
+ 	  messagingSenderId: "396232133147",
+  	  appId: "1:396232133147:web:3139d331b0ad2b38df86be",
+  	  measurementId: "G-DG0MQYCWZC"
+        };
+        // --- END OF FIREBASE CONFIGURATION ---
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // Global variables
+        let app, db, auth, userId;
+        let allUserDecks = [];
+        let progressSubjects = [];
+        let progressChartInstance = null;
+
+
+        // --- UI RENDERING ---
+
+        function renderAppLayout() {
+            const appRoot = document.getElementById('app-root');
+            appRoot.innerHTML = `
+                <div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200">
+                    <!-- Sidebar -->
+                    <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col p-4">
+                        <div class="h-16 flex items-center px-2 flex-shrink-0">
+                            <span class="text-2xl font-bold">Flashcards</span>
+                        </div>
+                        <nav id="main-nav" class="flex flex-col space-y-1 flex-shrink-0">
+                            <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
+                                My decks
+                            </a>
+                            <a href="#" id="nav-progress" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                Progress
+                            </a>
+                            <a href="#" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                                Public decks
+                            </a>
+                        </nav>
+                        <div class="space-y-2 pt-2 flex-shrink-0">
+                            <button id="sidebar-quiz-btn" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+                                Quiz
+                            </button>
+                            <button id="sidebar-add-deck-btn" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                                Add Deck
+                            </button>
+                        </div>
+                        <div class="flex-grow pt-4 border-t border-gray-200 dark:border-gray-700 mt-2 flex flex-col min-h-0">
+                            <h3 class="px-2 text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex justify-between items-center flex-shrink-0">
+                                <span>Library</span>
+                                <div class="flex items-center space-x-2">
+                                     <button id="library-add-btn" class="text-gray-400 hover:text-gray-600">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                    </button>
+                                </div>
+                            </h3>
+                             <div class="relative mt-2 px-2 flex-shrink-0">
+                                <input type="text" id="library-search-input" placeholder="Search..." class="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                                <div class="absolute inset-y-0 left-2 pl-1 flex items-center pointer-events-none">
+                                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                </div>
+                            </div>
+                            <div id="library-list" class="mt-2 space-y-1 flex-grow overflow-y-auto pr-2">
+                                <!-- Library items would be dynamically added here -->
+                            </div>
+                        </div>
+                    </aside>
+
+                    <div class="flex-1 flex flex-col overflow-hidden">
+                        <header class="h-16 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-6 flex-shrink-0">
+                            <div id="main-header">
+                                <h1 class="text-xl font-semibold">My decks</h1>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <button id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5">
+                                    <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                                    <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                                </button>
+                            </div>
+                        </header>
+
+                        <main id="app-content" class="flex-1 overflow-y-auto p-6"></main>
+                    </div>
+                </div>
+
+                <!-- Modals container -->
+                <div id="modals-container"></div>
+            `;
+            setupEventListeners();
+        }
+        
+        function renderLibrary(decks, searchTerm = '') {
+            const libraryList = document.getElementById('library-list');
+            if (!libraryList) return;
+
+            const sortedDecks = decks.sort((a, b) => a.topic.localeCompare(b.topic));
+            
+             const decksHTML = sortedDecks.map(deck => {
+                let topicHTML;
+                const escapedTopic = deck.topic.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+                if (!searchTerm.trim()) {
+                    topicHTML = `<span>${escapedTopic}</span>`;
+                } else {
+                    const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
+                    topicHTML = escapedTopic.replace(regex, `<strong class="font-bold">$1</strong>`);
+                }
+                
+                return `
+                <a href="#" class="flex items-center px-2 py-1 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" data-id="${deck.id}">
+                >&nbsp;${topicHTML}
+                </a>
+                `;
+            }).join('');
+
+            libraryList.innerHTML = decksHTML;
+        }
+
+        function renderDecksView(decks) {
+            setActiveNav('nav-my-decks');
+            const content = document.getElementById('app-content');
+            setHeader('My decks');
+            const topicStyles = {
+                'Psychology': { color: 'bg-rose-300', icon: '🧠' },
+                'Biology': { color: 'bg-orange-400', icon: '📄' },
+                'Chemistry': { color: 'bg-red-400', icon: '❤️' },
+                'Physics': { color: 'bg-blue-400', icon: '⚙️' },
+                'Geography': { color: 'bg-purple-400', icon: '📍' },
+                'English': { color: 'bg-emerald-400', icon: '💬' },
+                'Economics': { color: 'bg-teal-400', icon: '❓' },
+                'Spanish': { color: 'bg-amber-400', icon: 'ℹ️' },
+                'History': { color: 'bg-stone-500', icon: '🏛️' },
+                'Math': { color: 'bg-sky-400', icon: '🧮' },
+                'Default': { color: 'bg-gray-400', icon: '📚' }
+            };
+            
+            const getTopicStyle = (topic) => topicStyles[topic] || topicStyles['Default'];
+
+            if (decks.length === 0) {
+                 content.innerHTML = `
+                    <div class="text-center py-12">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No decks</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new deck.</p>
+                        <div class="mt-6">
+                            <button id="empty-add-deck-btn" type="button" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                                New Deck
+                            </button>
+                        </div>
+                    </div>`;
+                document.getElementById('empty-add-deck-btn').addEventListener('click', () => renderAddDeckModal());
+                return;
+            }
+
+            content.innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    ${decks.map(deck => {
+                        const style = getTopicStyle(deck.topic);
+                        const cardCount = deck.cards ? deck.cards.length : 0;
+                        return `
+                        <div class="deck-card bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden cursor-pointer transform hover:-translate-y-1 transition-transform duration-200" data-id="${deck.id}">
+                            <div class="p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 rounded-lg ${style.color} flex items-center justify-center text-lg">${style.icon}</div>
+                                        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">${deck.topic}</h3>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <button class="rename-deck-btn text-gray-400 hover:text-blue-500 mr-2" data-id="${deck.id}" data-topic="${deck.topic}">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                                        </button>
+                                        <button class="delete-deck-btn text-gray-400 hover:text-red-500" data-id="${deck.id}">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">${cardCount} cards</p>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+
+            document.querySelectorAll('.deck-card').forEach(card => card.addEventListener('click', (e) => {
+                if (!e.target.closest('.delete-deck-btn') && !e.target.closest('.rename-deck-btn')) {
+                    viewDeck(card.dataset.id);
+                }
+            }));
+            document.querySelectorAll('.delete-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteDeck(btn.dataset.id);
+            }));
+            document.querySelectorAll('.rename-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                renderRenameDeckModal(btn.dataset.id, btn.dataset.topic);
+            }));
+        }
+        
+        async function renderSingleDeckView(deckId) {
+            try {
+                const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                const deckSnap = await getDoc(deckRef);
+                if (!deckSnap.exists()) {
+                    console.error("Deck not found");
+                    renderDecksView(allUserDecks);
+                    return;
+                }
+                const deck = { id: deckSnap.id, ...deckSnap.data() };
+                const cards = deck.cards || [];
+                setHeader(deck.topic);
+                
+                const content = document.getElementById('app-content');
+                content.innerHTML = `
+                    <div class="flex flex-col space-y-4">
+                       <div class="flex items-center justify-between">
+                           <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
+                               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                               Back to Decks
+                           </button>
+                           <div class="flex space-x-2">
+                               <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Card</button>
+                               <button id="start-quiz-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" ${cards.length === 0 ? 'disabled' : ''}>Start Quiz</button>
+                           </div>
+                       </div>
+                        <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                            <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                                ${cards.length > 0 ? cards.map((card, index) => `
+                                    <li class="p-4 flex items-center justify-between">
+                                        <div class="flex-1 mr-4">
+                                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <button class="edit-card-btn text-gray-400 hover:text-blue-500 mr-2" data-index="${index}">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                                            </button>
+                                            <button class="delete-card-btn text-gray-400 hover:text-red-500" data-index="${index}">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            </button>
+                                        </div>
+                                    </li>
+                                `).join('') : `<li class="p-6 text-center text-gray-500">No cards in this deck yet.</li>`}
+                            </ul>
+                        </div>
+                    </div>`;
+
+                document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
+                document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
+                document.getElementById('start-quiz-btn').addEventListener('click', () => renderQuizModal(deck));
+                
+                document.querySelectorAll('.edit-card-btn').forEach(btn => {
+                    const cardIndex = parseInt(btn.dataset.index);
+                    const cardToEdit = cards[cardIndex];
+                    btn.addEventListener('click', () => {
+                        renderEditCardModal(deckId, cardIndex, cardToEdit);
+                    });
+                });
+
+                document.querySelectorAll('.delete-card-btn').forEach(btn => btn.addEventListener('click', () => {
+                    deleteCard(deckId, parseInt(btn.dataset.index));
+                }));
+            } catch (error) {
+                console.error("Error fetching single deck:", error);
+            }
+        }
+
+        function renderProgressView() {
+            setActiveNav('nav-progress');
+            setHeader('Progress Tracker');
+            const content = document.getElementById('app-content');
+
+            content.innerHTML = `
+                <div id="progress-view-container">
+                    <div id="overall-progress-chart-container" class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-8">
+                        <h3 class="text-lg font-semibold mb-4">Overall Subject Progress</h3>
+                        <div class="h-64">
+                            <canvas id="subjects-progress-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="flex justify-end mb-4">
+                        <button id="add-subject-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                            Add Subject
+                        </button>
+                    </div>
+                    <div id="subject-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Subject cards will be rendered here -->
+                    </div>
+                </div>
+            `;
+            
+            if (progressSubjects.length === 0) {
+                 document.getElementById('subject-cards-container').innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Subjects</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by adding a subject to track.</p>
+                        <div class="mt-6">
+                            <button id="add-subject-btn-empty" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                Add Subject
+                            </button>
+                        </div>
+                    </div>`;
+                document.getElementById('add-subject-btn-empty').addEventListener('click', renderAddSubjectModal);
+                document.getElementById('add-subject-btn').classList.add('hidden');
+                document.getElementById('overall-progress-chart-container').classList.add('hidden');
+                return;
+            }
+
+            drawSubjectsProgressBarChart(progressSubjects);
+
+            const subjectCards = progressSubjects.map(subject => {
+                const units = subject.units || [];
+                let totalProgress = 0;
+                if(units.length > 0) {
+                    const unitWeight = 100 / units.length;
+                    const totalPoints = units.reduce((sum, unit) => {
+                        const topics = unit.topics || [];
+                        if (topics.length === 0) return sum;
+                        const completed = topics.filter(t => t.done).length;
+                        return sum + (completed / topics.length) * unitWeight;
+                    }, 0);
+                    totalProgress = totalPoints;
+                }
+                
+                return `
+                <div class="subject-card bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer" data-id="${subject.id}">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-semibold text-lg">${subject.name}</h3>
+                            <p class="text-sm text-gray-500">${Math.round(totalProgress)}% Complete</p>
+                        </div>
+                        <div class="flex items-center">
+                            <button class="rename-subject-btn text-gray-400 hover:text-blue-500 mr-2" data-id="${subject.id}" data-name="${subject.name}">
+                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                            </button>
+                            <button class="delete-subject-btn text-gray-400 hover:text-red-500" data-id="${subject.id}">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+            
+            document.getElementById('subject-cards-container').innerHTML = subjectCards;
+
+            document.getElementById('add-subject-btn').addEventListener('click', renderAddSubjectModal);
+            document.querySelectorAll('.subject-card').forEach(card => card.addEventListener('click', e => {
+                if (!e.target.closest('.delete-subject-btn') && !e.target.closest('.rename-subject-btn')) {
+                    renderSingleSubjectView(card.dataset.id);
+                }
+            }));
+            document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', e => {
+                e.stopPropagation();
+                deleteProgressSubject(btn.dataset.id);
+            }));
+            document.querySelectorAll('.rename-subject-btn').forEach(btn => btn.addEventListener('click', e => {
+                e.stopPropagation();
+                renderRenameSubjectModal(btn.dataset.id, btn.dataset.name);
+            }));
+        }
+
+        function renderSingleSubjectView(subjectId) {
+            const subject = progressSubjects.find(s => s.id === subjectId);
+            if (!subject) {
+                renderProgressView();
+                return;
+            }
+
+            const units = subject.units || [];
+            
+            let totalProgress = 0;
+            if (units.length > 0) {
+                const unitWeight = 100 / units.length;
+                totalProgress = units.reduce((sum, unit) => {
+                    const topics = unit.topics || [];
+                    if (topics.length === 0) return sum;
+                    const completed = topics.filter(t => t.done).length;
+                    return sum + (completed / topics.length) * unitWeight;
+                }, 0);
+            }
+            setHeader(subject.name);
+            
+            const content = document.getElementById('app-content');
+            
+            const unitListHTML = units.map((unit, unitIndex) => {
+                const topics = unit.topics || [];
+                const unitProgress = topics.length > 0 ? (topics.filter(t => t.done).length / topics.length) * 100 : 0;
+                const topicItems = topics.map((topic, topicIndex) => `
+                    <li class="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md group">
+                        <div class="flex items-center">
+                            <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 topic-checkbox" data-unit-index="${unitIndex}" data-topic-index="${topicIndex}" ${topic.done ? 'checked' : ''}>
+                            <label class="ml-3 text-sm text-gray-800 dark:text-gray-200">${topic.name}</label>
+                        </div>
+                        <div class="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button class="edit-topic-btn text-gray-400 hover:text-blue-500 mr-2" data-unit-index="${unitIndex}" data-topic-index="${topicIndex}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                            </button>
+                            <button class="delete-topic-btn text-gray-400 hover:text-red-500" data-unit-index="${unitIndex}" data-topic-index="${topicIndex}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                    </li>
+                `).join('');
+
+                return `
+                <details class="bg-gray-50 dark:bg-gray-700 rounded-lg" open>
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold">
+                        <span>${unit.name}</span>
+                        <div class="flex items-center">
+                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400 mr-4">${Math.round(unitProgress)}%</span>
+                             <button class="rename-unit-btn text-gray-400 hover:text-blue-500 mr-2" data-unit-index="${unitIndex}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                            </button>
+                            <button class="delete-unit-btn text-gray-400 hover:text-red-500" data-unit-index="${unitIndex}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    </summary>
+                    <div class="p-4 border-t dark:border-gray-600">
+                        <ul class="space-y-2 mb-4">${topicItems}</ul>
+                        <button class="add-topic-to-unit-btn text-sm text-blue-600 hover:underline" data-unit-index="${unitIndex}">+ Add Topic(s)</button>
+                    </div>
+                </details>`;
+            }).join('');
+
+            content.innerHTML = `
+                <div class="flex flex-col gap-8">
+                    <div class="flex items-center">
+                        <button id="back-to-progress" class="flex items-center text-sm text-blue-600 hover:underline">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                            Back to Subjects
+                        </button>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex flex-col items-center justify-center">
+                         <h3 class="text-lg font-semibold mb-4 text-center">Overall Progress: <span class="text-blue-600 font-bold">${Math.round(totalProgress)}%</span></h3>
+                         <div class="w-64 h-64">
+                            <canvas id="progress-chart"></canvas>
+                         </div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">Units</h3>
+                            <button id="add-unit-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Unit</button>
+                        </div>
+                        <div id="unit-list" class="space-y-4">${unitListHTML}</div>
+                    </div>
+                </div>
+            `;
+            
+            drawUnitBasedPieChart(subject);
+
+            document.getElementById('back-to-progress').addEventListener('click', renderProgressView);
+            document.getElementById('add-unit-btn').addEventListener('click', () => renderAddUnitModal(subjectId));
+
+            document.querySelectorAll('.topic-checkbox').forEach(box => box.addEventListener('change', e => {
+                const unitIndex = parseInt(e.target.dataset.unitIndex);
+                const topicIndex = parseInt(e.target.dataset.topicIndex);
+                updateTopicStatus(subjectId, unitIndex, topicIndex, e.target.checked);
+            }));
+
+            document.querySelectorAll('.add-topic-to-unit-btn').forEach(btn => btn.addEventListener('click', e => {
+                const unitIndex = parseInt(e.currentTarget.dataset.unitIndex);
+                renderAddTopicModal(subjectId, unitIndex);
+            }));
+
+            document.querySelectorAll('#unit-list details').forEach(detailElement => {
+                const unitIndex = parseInt(detailElement.querySelector('.rename-unit-btn').dataset.unitIndex);
+                detailElement.addEventListener('mouseenter', () => drawIndividualUnitPieChart(units[unitIndex]));
+                detailElement.addEventListener('mouseleave', () => drawUnitBasedPieChart(subject));
+            });
+
+            document.querySelectorAll('.rename-unit-btn').forEach(btn => btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const unitIndex = parseInt(e.currentTarget.dataset.unitIndex);
+                renderRenameUnitModal(subjectId, unitIndex, units[unitIndex].name);
+            }));
+             document.querySelectorAll('.delete-unit-btn').forEach(btn => btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const unitIndex = parseInt(e.currentTarget.dataset.unitIndex);
+                deleteUnit(subjectId, unitIndex);
+            }));
+
+            document.querySelectorAll('.edit-topic-btn').forEach(btn => btn.addEventListener('click', e => {
+                const unitIndex = parseInt(e.currentTarget.dataset.unitIndex);
+                const topicIndex = parseInt(e.currentTarget.dataset.topicIndex);
+                renderEditTopicModal(subjectId, unitIndex, topicIndex, units[unitIndex].topics[topicIndex]);
+            }));
+             document.querySelectorAll('.delete-topic-btn').forEach(btn => btn.addEventListener('click', e => {
+                const unitIndex = parseInt(e.currentTarget.dataset.unitIndex);
+                const topicIndex = parseInt(e.currentTarget.dataset.topicIndex);
+                deleteTopicFromUnit(subjectId, unitIndex, topicIndex);
+            }));
+        }
+
+        function drawSubjectsProgressBarChart(subjects) {
+            const ctx = document.getElementById('subjects-progress-chart');
+            if (!ctx) return;
+
+            if (progressChartInstance) {
+                progressChartInstance.destroy();
+            }
+
+            const subjectNames = subjects.map(s => s.name);
+            const subjectProgressData = subjects.map(subject => {
+                const units = subject.units || [];
+                if (units.length === 0) return 0;
+                const unitWeight = 100 / units.length;
+                const totalPoints = units.reduce((sum, unit) => {
+                    const topics = unit.topics || [];
+                    if (topics.length === 0) return sum;
+                    const completed = topics.filter(t => t.done).length;
+                    return sum + (completed / topics.length) * unitWeight;
+                }, 0);
+                return totalPoints;
+            });
+
+            progressChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: subjectNames,
+                    datasets: [{
+                        label: 'Progress',
+                        data: subjectProgressData,
+                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: value => value + "%",
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#333'
+                            },
+                            grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: document.documentElement.classList.contains('dark') ? '#fff' : '#333' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Progress: ${context.parsed.x.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function drawUnitBasedPieChart(subject) {
+            const units = subject.units || [];
+            const ctx = document.getElementById('progress-chart');
+            if (!ctx) return;
+
+            if (progressChartInstance) {
+                progressChartInstance.destroy();
+            }
+
+            if (units.length === 0) {
+                ctx.parentElement.innerHTML = `<p class="text-center text-gray-500">Add units and topics to see progress.</p>`;
+                return;
+            }
+
+            const unitWeight = 100 / units.length;
+            
+            let totalCompletedPercentage = 0;
+            const labels = [];
+            const data = [];
+            const backgroundColors = [];
+
+            units.forEach((unit, index) => {
+                const topics = unit.topics || [];
+                const completedTopics = topics.filter(t => t.done).length;
+                const unitProgress = topics.length > 0 ? completedTopics / topics.length : 0;
+                const weightedProgress = unitProgress * unitWeight;
+                
+                if(weightedProgress > 0) {
+                    labels.push(unit.name);
+                    data.push(weightedProgress);
+                    backgroundColors.push(`hsl(${(index * 60) % 360}, 70%, 60%)`);
+                    totalCompletedPercentage += weightedProgress;
+                }
+            });
+
+            const remainingPercentage = 100 - totalCompletedPercentage;
+            if(remainingPercentage > 0.01) { 
+                labels.push('Remaining');
+                data.push(remainingPercentage);
+                backgroundColors.push(document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb');
+            }
+
+            progressChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: document.documentElement.classList.contains('dark') ? '#1f2937' : '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#333'
+                            }
+                        },
+                        title: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if(label === 'Remaining') {
+                                        return `Remaining: ${context.parsed.toFixed(1)}%`;
+                                    }
+                                    const unit = units.find(u => u.name === label);
+                                    if (unit) {
+                                        const topics = unit.topics || [];
+                                        const completed = topics.filter(t => t.done).length;
+                                        const total = topics.length;
+                                        const percentage = total > 0 ? (completed / total) * 100 : 0;
+                                        return `${label}: ${percentage.toFixed(1)}% complete`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawIndividualUnitPieChart(unit) {
+            const ctx = document.getElementById('progress-chart');
+            if (!ctx) return;
+
+            if (progressChartInstance) {
+                progressChartInstance.destroy();
+            }
+
+            const topics = unit.topics || [];
+            const completed = topics.filter(t => t.done).length;
+            const remaining = topics.length - completed;
+
+            progressChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Completed', 'Remaining'],
+                    datasets: [{
+                        data: [completed, remaining],
+                        backgroundColor: ['#4ade80', '#e2e8f0'],
+                        borderColor: ['#22c55e', '#cbd5e1'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#333'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: `${unit.name} Progress`,
+                            color: document.documentElement.classList.contains('dark') ? '#fff' : '#333'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed !== null) {
+                                        const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? (context.parsed / total) * 100 : 0;
+                                        label += `${context.raw} (${percentage.toFixed(1)}%)`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderModal(id, title, content, onSave, saveLabel = 'Save') {
+             const modalHTML = `
+                <div id="${id}" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+                        <div class="flex items-center justify-between p-4 border-b dark:border-gray-700">
+                            <h3 class="text-lg font-medium">${title}</h3>
+                            <button class="modal-close-btn text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <div class="p-6">${content}</div>
+                        <div class="flex justify-end p-4 bg-gray-50 dark:bg-gray-800 border-t dark:border-gray-700 rounded-b-lg">
+                            <button class="modal-close-btn px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 mr-2">Cancel</button>
+                            <button id="modal-save-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">${saveLabel}</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.getElementById('modals-container').innerHTML = modalHTML;
+            
+            const modal = document.getElementById(id);
+            modal.querySelector('#modal-save-btn').addEventListener('click', onSave);
+            modal.querySelectorAll('.modal-close-btn').forEach(btn => btn.addEventListener('click', () => modal.remove()));
+        }
+
+        function renderAddDeckModal() {
+            renderModal('add-deck-modal', 'Create New Deck', `
+                <form id="create-deck-form">
+                    <label for="deck-topic" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic</label>
+                    <input type="text" id="deck-topic" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </form>`, 
+            () => {
+                const topic = document.getElementById('deck-topic').value;
+                if (topic) {
+                    createDeck(topic);
+                    document.getElementById('add-deck-modal')?.remove();
+                }
+            }, 'Create Deck');
+        }
+
+        function renderAddSubjectModal() {
+            renderModal('add-subject-modal', 'Add New Subject', `
+                <form id="add-subject-form">
+                    <label for="subject-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Subject Name</label>
+                    <input type="text" id="subject-name" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </form>`, 
+            () => {
+                const name = document.getElementById('subject-name').value.trim();
+                if (name) {
+                    addProgressSubject(name);
+                    document.getElementById('add-subject-modal')?.remove();
+                }
+            }, 'Add Subject');
+        }
+
+        function renderAddUnitModal(subjectId) {
+             renderModal('add-unit-modal', 'Add New Unit', `
+                <form>
+                    <label for="unit-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit Name</label>
+                    <input type="text" id="unit-name" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">
+                </form>`, 
+            () => {
+                const name = document.getElementById('unit-name').value.trim();
+                if (name) {
+                    addUnitToSubject(subjectId, name);
+                    document.getElementById('add-unit-modal')?.remove();
+                }
+            }, 'Add Unit');
+        }
+        
+        function renderRenameUnitModal(subjectId, unitIndex, currentName) {
+            renderModal('rename-unit-modal', 'Rename Unit', `
+                <form>
+                    <label for="unit-name-rename" class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Unit Name</label>
+                    <input type="text" id="unit-name-rename" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" value="${currentName}">
+                </form>`, 
+            () => {
+                const newName = document.getElementById('unit-name-rename').value.trim();
+                if (newName && newName !== currentName) {
+                    updateUnitName(subjectId, unitIndex, newName);
+                    document.getElementById('rename-unit-modal')?.remove();
+                }
+            }, 'Rename');
+        }
+
+
+        function renderRenameSubjectModal(subjectId, currentName) {
+            renderModal('rename-subject-modal', 'Rename Subject', `
+                <form>
+                    <label for="subject-name-rename" class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Subject Name</label>
+                    <input type="text" id="subject-name-rename" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" value="${currentName}">
+                </form>`, 
+            () => {
+                const newName = document.getElementById('subject-name-rename').value.trim();
+                if (newName && newName !== currentName) {
+                    updateSubjectName(subjectId, newName);
+                    document.getElementById('rename-subject-modal')?.remove();
+                }
+            }, 'Rename');
+        }
+
+        function renderEditTopicModal(subjectId, unitIndex, topicIndex, topic) {
+            renderModal('edit-topic-modal', 'Edit Topic', `
+                <form>
+                    <label for="topic-name-edit" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic Name</label>
+                    <input type="text" id="topic-name-edit" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" value="${topic.name}">
+                </form>`, 
+            () => {
+                const newName = document.getElementById('topic-name-edit').value.trim();
+                if (newName && newName !== topic.name) {
+                    updateTopicName(subjectId, unitIndex, topicIndex, newName);
+                    document.getElementById('edit-topic-modal')?.remove();
+                }
+            }, 'Save');
+        }
+        
+        function renderRenameDeckModal(deckId, currentTopic) {
+            renderModal('rename-deck-modal', 'Rename Deck', `
+                <form id="rename-deck-form">
+                    <label for="deck-topic-rename" class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Topic Name</label>
+                    <input type="text" id="deck-topic-rename" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" value="${currentTopic}">
+                </form>`,
+            () => {
+                const newTopic = document.getElementById('deck-topic-rename').value.trim();
+                if (newTopic && newTopic !== currentTopic) {
+                    updateDeckTopic(deckId, newTopic);
+                    document.getElementById('rename-deck-modal')?.remove();
+                } else {
+                    document.getElementById('rename-deck-modal')?.remove();
+                }
+            }, 'Rename Deck');
+        }
+
+        function renderEditCardModal(deckId, cardIndex, card) {
+            const modalContent = `
+                <form id="edit-card-form" class="space-y-4">
+                    <div>
+                        <label for="edit-card-question" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Question</label>
+                        <textarea id="edit-card-question" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${card.question}</textarea>
+                    </div>
+                    <div>
+                        <label for="edit-card-answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Answer</label>
+                        <textarea id="edit-card-answer" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${card.answer}</textarea>
+                    </div>
+                </form>
+            `;
+
+            renderModal('edit-card-modal', 'Edit Card', modalContent,
+            () => { // onSave logic
+                const newQuestion = document.getElementById('edit-card-question').value.trim();
+                const newAnswer = document.getElementById('edit-card-answer').value.trim();
+
+                if (newQuestion && newAnswer) {
+                    updateCard(deckId, cardIndex, newQuestion, newAnswer);
+                    document.getElementById('edit-card-modal')?.remove();
+                }
+            }, 'Save Changes');
+        }
+
+        function renderAddTopicModal(subjectId, unitIndex) {
+             const modalContent = `
+                <div>
+                    <!-- Tabs -->
+                    <div class="border-b border-gray-200 dark:border-gray-700">
+                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button id="simple-add-tab-topic" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
+                                Simple Add
+                            </button>
+                            <button id="bulk-add-tab-topic" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
+                                Bulk Add
+                            </button>
+                        </nav>
+                    </div>
+                    <form class="mt-6">
+                        <div id="simple-add-view-topic">
+                            <label for="topic-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic Name</label>
+                            <input type="text" id="topic-name" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">
+                        </div>
+                        <div id="bulk-add-view-topic" class="hidden">
+                             <label for="bulk-topics-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topics</label>
+                             <textarea id="bulk-topics-input" rows="10" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" placeholder="Topic 1, Topic 2, Topic 3"></textarea>
+                             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Separate topics with a comma (,).</p>
+                        </div>
+                    </form>
+                </div>
+            `;
+            renderModal('add-topic-modal', 'Add New Topic(s)', modalContent, () => {
+                const isBulk = !document.getElementById('bulk-add-view-topic').classList.contains('hidden');
+                let newTopics = [];
+                if(isBulk) {
+                    const bulkText = document.getElementById('bulk-topics-input').value.trim();
+                    if(bulkText) {
+                        newTopics = bulkText.split(',').map(name => name.trim()).filter(name => name);
+                    }
+                } else {
+                    const topicName = document.getElementById('topic-name').value.trim();
+                    if(topicName) newTopics.push(topicName);
+                }
+                
+                if (newTopics.length > 0) {
+                    addMultipleTopicsToUnit(subjectId, unitIndex, newTopics);
+                    document.getElementById('add-topic-modal')?.remove();
+                }
+
+            }, 'Add Topic(s)');
+
+            // Tab switching logic
+            const simpleTab = document.getElementById('simple-add-tab-topic');
+            const bulkTab = document.getElementById('bulk-add-tab-topic');
+            const simpleView = document.getElementById('simple-add-view-topic');
+            const bulkView = document.getElementById('bulk-add-view-topic');
+            
+            const activateTab = (tabToActivate, viewToShow) => {
+                simpleTab.classList.remove('text-blue-600', 'border-blue-600');
+                simpleTab.classList.add('text-gray-500', 'border-transparent');
+                bulkTab.classList.remove('text-blue-600', 'border-blue-600');
+                bulkTab.classList.add('text-gray-500', 'border-transparent');
+                
+                tabToActivate.classList.add('text-blue-600', 'border-blue-600');
+                tabToActivate.classList.remove('text-gray-500', 'border-transparent');
+
+                simpleView.classList.add('hidden');
+                bulkView.classList.add('hidden');
+                viewToShow.classList.remove('hidden');
+            };
+
+            simpleTab.addEventListener('click', () => activateTab(simpleTab, simpleView));
+            bulkTab.addEventListener('click', () => activateTab(bulkTab, bulkView));
+        }
+
+        function renderAddCardModal(deckId) {
+            const modalContent = `
+                <div>
+                    <!-- Tabs -->
+                    <div class="border-b border-gray-200 dark:border-gray-700">
+                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button id="simple-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
+                                Simple Add
+                            </button>
+                            <button id="bulk-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
+                                Bulk Add
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Form Content -->
+                    <form id="add-card-form" class="mt-6">
+                        <!-- Simple Add View (Default) -->
+                        <div id="simple-add-view" class="space-y-4">
+                            <div>
+                                <label for="card-question" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Question</label>
+                                <textarea id="card-question" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                            </div>
+                            <div>
+                                <label for="card-answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Answer</label>
+                                <textarea id="card-answer" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Bulk Add View (Hidden by default) -->
+                        <div id="bulk-add-view" class="hidden">
+                             <div>
+                                <label for="bulk-cards-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cards</label>
+                                <textarea id="bulk-cards-input" rows="10" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Question 1: Answer 1\n\nQuestion 2: Answer 2"></textarea>
+                                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Separate cards with a blank line. Separate question and answer with a colon (:).</p>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            renderModal('add-card-modal', 'Add New Card(s)', modalContent,
+            () => { // onSave logic
+                const simpleAddView = document.getElementById('simple-add-view');
+                let newCards = [];
+
+                if (!simpleAddView.classList.contains('hidden')) { // Simple Add Mode
+                    const question = document.getElementById('card-question').value.trim();
+                    const answer = document.getElementById('card-answer').value.trim();
+                    if (question && answer) {
+                        newCards.push({ question, answer });
+                    }
+                } else { // Bulk Add Mode
+                    const bulkText = document.getElementById('bulk-cards-input').value.trim();
+                    if (bulkText) {
+                        const cardBlocks = bulkText.split('\n\n');
+                        newCards = cardBlocks
+                            .map(block => {
+                                if (block.trim() === '') return null;
+                                const parts = block.split(':');
+                                if (parts.length >= 2) {
+                                    const question = parts[0].trim();
+                                    const answer = parts.slice(1).join(':').trim();
+                                    if (question && answer) {
+                                        return { question, answer };
+                                    }
+                                }
+                                return null;
+                            })
+                            .filter(card => card !== null);
+                    }
+                }
+
+                if (newCards.length > 0) {
+                    addMultipleCardsToDeck(deckId, newCards);
+                    document.getElementById('add-card-modal')?.remove();
+                }
+
+            }, 'Add Card(s)');
+
+            // Add event listeners for tab switching
+            const simpleTab = document.getElementById('simple-add-tab');
+            const bulkTab = document.getElementById('bulk-add-tab');
+            const simpleView = document.getElementById('simple-add-view');
+            const bulkView = document.getElementById('bulk-add-view');
+
+            simpleTab.addEventListener('click', () => {
+                // Activate simple tab
+                simpleTab.classList.add('text-blue-600', 'border-blue-600');
+                simpleTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
+                // Deactivate bulk tab
+                bulkTab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
+                bulkTab.classList.remove('text-blue-600', 'border-blue-600');
+
+                // Show/hide views
+                simpleView.classList.remove('hidden');
+                bulkView.classList.add('hidden');
+            });
+
+            bulkTab.addEventListener('click', () => {
+                // Activate bulk tab
+                bulkTab.classList.add('text-blue-600', 'border-blue-600');
+                bulkTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
+                // Deactivate simple tab
+                simpleTab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
+                simpleTab.classList.remove('text-blue-600', 'border-blue-600');
+
+                // Show/hide views
+                bulkView.classList.remove('hidden');
+                simpleView.classList.add('hidden');
+            });
+        }
+
+        function renderQuizModal(deck) {
+            let currentCardIndex = 0;
+            
+            const modalContent = `
+                <div id="quiz-content" class="h-96 flex flex-col items-center justify-center">
+                    <!-- Card will be rendered here -->
+                </div>
+            `;
+
+            renderModal('quiz-modal', `${deck.topic} Quiz`, modalContent, () => {}, '');
+            // Hide default save/cancel buttons for quiz
+            const quizModal = document.getElementById('quiz-modal');
+            quizModal.querySelector('#modal-save-btn').style.display = 'none';
+            quizModal.querySelector('.modal-close-btn').style.display = 'none'; // Hide cancel button in footer too
+            
+            function showCard(index) {
+                const quizContent = document.getElementById('quiz-content');
+                if (!deck.cards || index >= deck.cards.length) {
+                    quizContent.innerHTML = `<div class="text-center">
+                        <h2 class="text-2xl font-bold mb-4">Quiz Complete!</h2>
+                        <button id="quiz-close-btn-final" class="px-4 py-2 text-white bg-blue-600 rounded-lg">Close Quiz</button>
+                    </div>`;
+                     document.getElementById('quiz-close-btn-final').addEventListener('click', () => document.getElementById('quiz-modal').remove());
+                    return;
+                }
+
+                const cardData = deck.cards[index];
+                quizContent.innerHTML = `
+                    <p class="text-sm text-gray-500 mb-2">${index + 1} / ${deck.cards.length}</p>
+                    <div class="scene w-full h-64">
+                        <div id="quiz-card" class="card relative w-full h-full">
+                            <div class="card-face absolute w-full h-full flex items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-lg">
+                                <p class="text-xl text-center">${cardData.question}</p>
+                            </div>
+                            <div class="card-face card-face-back absolute w-full h-full flex items-center justify-center p-6 bg-blue-100 dark:bg-blue-900 rounded-lg shadow-lg">
+                                 <p class="text-xl text-center font-semibold">${cardData.answer}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex space-x-4">
+                        <button id="flip-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600">Flip</button>
+                        <button id="next-card-btn" class="px-6 py-2 rounded-lg bg-blue-600 text-white">Next</button>
+                    </div>
+                `;
+
+                const cardElement = document.getElementById('quiz-card');
+                document.getElementById('flip-card-btn').addEventListener('click', () => cardElement.classList.toggle('is-flipped'));
+                document.getElementById('next-card-btn').addEventListener('click', () => {
+                    currentCardIndex++;
+                    showCard(currentCardIndex);
+                });
+            }
+
+            showCard(currentCardIndex);
+        }
+        
+        function renderQuizSelectionModal(decks) {
+            const modalContent = `
+                <div id="quiz-deck-selection" class="space-y-2">
+                    ${decks.map(deck => `
+                        <button class="w-full text-left p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" data-deck-id="${deck.id}">
+                            ${deck.topic}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            renderModal('quiz-selection-modal', 'Select a Deck to Quiz', modalContent, () => {}, '');
+            const selectionModal = document.getElementById('quiz-selection-modal');
+            selectionModal.querySelector('#modal-save-btn').style.display = 'none'; // Hide footer buttons
+            selectionModal.querySelector('.modal-close-btn').style.display = 'none';
+
+            document.getElementById('quiz-deck-selection').addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (button && button.dataset.deckId) {
+                    const deckId = button.dataset.deckId;
+                    const selectedDeck = decks.find(d => d.id === deckId);
+                    if (selectedDeck) {
+                        selectionModal.remove();
+                        if (selectedDeck.cards && selectedDeck.cards.length > 0) {
+                            renderQuizModal(selectedDeck);
+                        } else {
+                            alert('This deck has no cards to quiz!');
+                        }
+                    }
+                }
+            });
+        }
+
+        function setHeader(title) {
+            const header = document.getElementById('main-header');
+            if(header) header.innerHTML = `<h1 class="text-xl font-semibold">${title}</h1>`;
+        }
+
+        function setActiveNav(activeId) {
+            const nav = document.getElementById('main-nav');
+            nav.querySelectorAll('a').forEach(link => {
+                if (link.id === activeId) {
+                    link.classList.add('text-gray-900', 'dark:text-white', 'bg-gray-100', 'dark:bg-gray-700', 'font-semibold');
+                    link.classList.remove('text-gray-600', 'dark:text-gray-400', 'font-medium');
+                } else {
+                    link.classList.remove('text-gray-900', 'dark:text-white', 'bg-gray-100', 'dark:bg-gray-700', 'font-semibold');
+                    link.classList.add('text-gray-600', 'dark:text-gray-400', 'font-medium');
+                }
+            });
+        }
+
+        // --- DATA LOGIC ---
+
+        async function createDeck(topic) {
+            try {
+                const decksCol = collection(db, `/artifacts/${appId}/users/${userId}/decks`);
+                await addDoc(decksCol, { topic, cards: [] });
+            } catch (error) {
+                console.error("Error creating deck:", error);
+            }
+        }
+        
+        async function updateDeckTopic(deckId, newTopic) {
+            try {
+                const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                await updateDoc(deckRef, {
+                    topic: newTopic
+                });
+            } catch (error) {
+                console.error("Error renaming deck:", error);
+            }
+        }
+
+        async function deleteDeck(deckId) {
+            if (confirm('Are you sure you want to delete this deck and all its cards?')) {
+                try {
+                    const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                    await deleteDoc(deckRef);
+                } catch (error) {
+                    console.error("Error deleting deck:", error);
+                }
+            }
+        }
+
+        async function addMultipleCardsToDeck(deckId, newCards) {
+            try {
+                const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                const deckSnap = await getDoc(deckRef);
+                if (deckSnap.exists()) {
+                    const deck = deckSnap.data();
+                    const existingCards = deck.cards || [];
+                    const updatedCards = [...existingCards, ...newCards];
+                    await updateDoc(deckRef, { cards: updatedCards });
+                    renderSingleDeckView(deckId); // Refresh view
+                }
+            } catch (error) {
+                console.error("Error adding multiple cards:", error);
+            }
+        }
+
+        async function updateCard(deckId, cardIndex, newQuestion, newAnswer) {
+            try {
+                const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                const deckSnap = await getDoc(deckRef);
+                if (deckSnap.exists()) {
+                    const deck = deckSnap.data();
+                    const updatedCards = [...deck.cards]; // Create a copy
+                    updatedCards[cardIndex] = { question: newQuestion, answer: newAnswer };
+                    await updateDoc(deckRef, { cards: updatedCards });
+                    renderSingleDeckView(deckId); // Refresh view
+                }
+            } catch (error) {
+                console.error("Error updating card:", error);
+            }
+        }
+
+        async function deleteCard(deckId, cardIndex) {
+            try {
+                const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                const deckSnap = await getDoc(deckRef);
+                if (deckSnap.exists()) {
+                    const deck = deckSnap.data();
+                    const updatedCards = deck.cards.filter((_, index) => index !== cardIndex);
+                    await updateDoc(deckRef, { cards: updatedCards });
+                    renderSingleDeckView(deckId); // Refresh view
+                }
+            } catch (error) {
+                console.error("Error deleting card:", error);
+            }
+        }
+        
+        // --- Progress Feature Data Logic ---
+        async function addProgressSubject(name) {
+            try {
+                const subjectsCol = collection(db, `/artifacts/${appId}/users/${userId}/progress_subjects`);
+                await addDoc(subjectsCol, { name, units: [] });
+            } catch(e) { console.error("Error adding subject: ", e); }
+        }
+
+        async function updateSubjectName(subjectId, newName) {
+            try {
+                const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                await updateDoc(subjectRef, { name: newName });
+            } catch(e) { console.error("Error renaming subject: ", e); }
+        }
+
+        async function deleteProgressSubject(subjectId) {
+            if (confirm('Are you sure you want to delete this subject and all its topics?')) {
+                try {
+                    const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                    await deleteDoc(subjectRef);
+                } catch (e) { console.error("Error deleting subject: ", e); }
+            }
+        }
+        
+        async function addUnitToSubject(subjectId, unitName) {
+            try {
+                const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                const docSnap = await getDoc(subjectRef);
+                if (docSnap.exists()) {
+                    const units = docSnap.data().units || [];
+                    await updateDoc(subjectRef, { units: [...units, { name: unitName, topics: [] }] });
+                }
+            } catch(e) { console.error("Error adding unit: ", e); }
+        }
+
+        async function updateUnitName(subjectId, unitIndex, newName) {
+            try {
+                const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                const docSnap = await getDoc(subjectRef);
+                if (docSnap.exists()) {
+                    const units = docSnap.data().units || [];
+                    if (units[unitIndex]) {
+                        units[unitIndex].name = newName;
+                        await updateDoc(subjectRef, { units: units });
+                    }
+                }
+            } catch(e) { console.error("Error updating unit name: ", e); }
+        }
+
+        async function deleteUnit(subjectId, unitIndex) {
+            if (confirm('Are you sure you want to delete this unit and all its topics?')) {
+                try {
+                    const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                    const docSnap = await getDoc(subjectRef);
+                    if (docSnap.exists()) {
+                        const units = docSnap.data().units || [];
+                        const updatedUnits = units.filter((_, index) => index !== unitIndex);
+                        await updateDoc(subjectRef, { units: updatedUnits });
+                    }
+                } catch(e) { console.error("Error deleting unit: ", e); }
+            }
+        }
+
+
+        async function addMultipleTopicsToUnit(subjectId, unitIndex, topicNames) {
+            try {
+                const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                const docSnap = await getDoc(subjectRef);
+                if (docSnap.exists()) {
+                    const units = docSnap.data().units || [];
+                    if (units[unitIndex]) {
+                        const currentTopics = units[unitIndex].topics || [];
+                        const newTopics = topicNames.map(name => ({ name, done: false }));
+                        units[unitIndex].topics = [...currentTopics, ...newTopics];
+                        await updateDoc(subjectRef, { units: units });
+                    }
+                }
+            } catch(e) { console.error("Error adding topics: ", e); }
+        }
+
+         async function updateTopicName(subjectId, unitIndex, topicIndex, newName) {
+            try {
+                const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                const docSnap = await getDoc(subjectRef);
+                if (docSnap.exists()) {
+                    const units = docSnap.data().units || [];
+                    if (units[unitIndex]?.topics[topicIndex]) {
+                        units[unitIndex].topics[topicIndex].name = newName;
+                        await updateDoc(subjectRef, { units: units });
+                    }
+                }
+            } catch(e) { console.error("Error updating topic name: ", e); }
+        }
+
+        async function updateTopicStatus(subjectId, unitIndex, topicIndex, isDone) {
+             try {
+                const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                const docSnap = await getDoc(subjectRef);
+                if (docSnap.exists()) {
+                    const units = docSnap.data().units || [];
+                     if (units[unitIndex]?.topics[topicIndex]) {
+                        units[unitIndex].topics[topicIndex].done = isDone;
+                        await updateDoc(subjectRef, { units: units });
+                    }
+                }
+            } catch(e) { console.error("Error updating topic status: ", e); }
+        }
+        
+        async function deleteTopicFromUnit(subjectId, unitIndex, topicIndex) {
+            try {
+                const subjectRef = doc(db, `/artifacts/${appId}/users/${userId}/progress_subjects`, subjectId);
+                const docSnap = await getDoc(subjectRef);
+                if (docSnap.exists()) {
+                   const units = docSnap.data().units || [];
+                     if (units[unitIndex]) {
+                        units[unitIndex].topics = units[unitIndex].topics.filter((_, index) => index !== topicIndex);
+                        await updateDoc(subjectRef, { units: units });
+                    }
+                }
+            } catch(e) { console.error("Error deleting topic: ", e); }
+        }
+
+        function viewDeck(deckId) {
+             renderSingleDeckView(deckId);
+        }
+        
+        function fetchAndDisplayDecks() {
+            const decksCol = collection(db, `/artifacts/${appId}/users/${userId}/decks`);
+            onSnapshot(decksCol, (snapshot) => {
+                const decks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allUserDecks = decks;
+                renderLibrary(decks);
+                const mainHeader = document.querySelector('#main-header h1');
+                if (mainHeader && mainHeader.textContent === 'My decks') {
+                    renderDecksView(decks);
+                }
+            });
+        }
+
+        function fetchProgressSubjects() {
+            const subjectsCol = collection(db, `/artifacts/${appId}/users/${userId}/progress_subjects`);
+            onSnapshot(subjectsCol, (snapshot) => {
+                progressSubjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const currentHeader = document.querySelector('#main-header h1')?.textContent;
+                
+                const subject = progressSubjects.find(s => s.name === currentHeader || currentHeader.startsWith(s.name + ' ('));
+                
+                if (currentHeader === 'Progress Tracker') {
+                    renderProgressView();
+                } else if (subject) {
+                    renderSingleSubjectView(subject.id);
+                }
+            });
+        }
+        
+        // --- INITIALIZATION ---
+        
+        function setupEventListeners() {
+            // Sidebar listeners
+            document.getElementById('nav-my-decks').addEventListener('click', (e) => {
+                e.preventDefault();
+                renderDecksView(allUserDecks);
+            });
+            document.getElementById('nav-progress').addEventListener('click', (e) => {
+                e.preventDefault();
+                renderProgressView();
+            });
+
+            document.getElementById('sidebar-add-deck-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                renderAddDeckModal();
+            });
+
+            document.getElementById('library-add-btn').addEventListener('click', renderAddDeckModal);
+
+            document.getElementById('library-list').addEventListener('click', (e) => {
+                const target = e.target.closest('a');
+                if (target && target.dataset.id) {
+                    e.preventDefault();
+                    const deckId = target.dataset.id;
+                    renderSingleDeckView(deckId);
+                }
+            });
+
+             document.getElementById('sidebar-quiz-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                 if (allUserDecks.length > 0) {
+                    renderQuizSelectionModal(allUserDecks);
+                } else {
+                    alert("You don't have any decks to quiz! Create a deck first.");
+                }
+            });
+
+            document.getElementById('library-search-input').addEventListener('input', (e) => {
+                const searchTerm = e.target.value;
+                const filteredDecks = searchTerm
+                    ? allUserDecks.filter(deck => deck.topic.toLowerCase().includes(searchTerm.toLowerCase()))
+                    : allUserDecks;
+                renderLibrary(filteredDecks, searchTerm);
+            });
+
+            // Theme toggle listener
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+            const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+            // Set initial icon visibility based on current theme
+            if (document.documentElement.classList.contains('dark')) {
+                themeToggleLightIcon.classList.remove('hidden');
+            } else {
+                themeToggleDarkIcon.classList.remove('hidden');
+            }
+
+            themeToggleBtn.addEventListener('click', () => {
+                // toggle icons
+                themeToggleDarkIcon.classList.toggle('hidden');
+                themeToggleLightIcon.classList.toggle('hidden');
+
+                // toggle theme and save preference
+                const isDark = document.documentElement.classList.toggle('dark');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+
+                if (progressChartInstance) {
+                    const textColor = isDark ? '#fff' : '#333';
+                    if (progressChartInstance.config.type === 'pie' || progressChartInstance.config.type === 'doughnut') {
+                        progressChartInstance.options.plugins.legend.labels.color = textColor;
+                    } else if (progressChartInstance.config.type === 'bar') {
+                        progressChartInstance.options.scales.x.ticks.color = textColor;
+                        progressChartInstance.options.scales.y.ticks.color = textColor;
+                        progressChartInstance.options.scales.x.grid.color = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+                    }
+                   progressChartInstance.update();
+                }
+            });
+        }
+
+        function initializeAndApplyTheme() {
+            const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+        
+        function startApp(firebaseConfig) {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        renderAppLayout();
+                        fetchAndDisplayDecks();
+                        fetchProgressSubjects();
+                    } else {
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (authError) {
+                            console.error("Authentication failed:", authError);
+                            document.getElementById('app-root').innerHTML = `<div class="p-4 text-center text-red-500"><h2>Authentication Failed</h2><p>${authError.message}</p></div>`;
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+                document.getElementById('app-root').innerHTML = `<div class="p-4 text-center text-red-500"><h2>Firebase Initialization Failed</h2><p>${e.message}</p></div>`;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAndApplyTheme();
+
+            if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+                document.getElementById('app-root').innerHTML = `<div class="w-full h-full flex items-center justify-center p-4">
+                  <div class="text-center bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl max-w-lg">
+                    <h1 class="text-2xl font-bold text-red-500">Configuration Missing</h1>
+                    <p class="mt-4 text-slate-600 dark:text-slate-400">Please open the HTML file in a text editor and replace the placeholder Firebase credentials in the &lt;script&gt; section with your own.</p>
+                  </div>
+                </div>`;
+                return;
+            }
+            startApp(firebaseConfig);
+        });
+
+    </script>
+</body>
+</html>
