@@ -1270,7 +1270,7 @@
                 try {
                     const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
                     // Also delete from public collection if it exists
-                    const publicDeckQuery = query(collection(db, `/artifacts/${appId}/public/decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
+                    const publicDeckQuery = query(collection(db, `/artifacts/${appId}/public_decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
                     const publicDeckSnapshot = await getDocs(publicDeckQuery);
                     const batch = writeBatch(db);
                     publicDeckSnapshot.forEach(doc => {
@@ -1462,7 +1462,7 @@
 
                 if (privateDeckSnap.exists()) {
                     const deckData = privateDeckSnap.data();
-                    const publicDecksCol = collection(db, `/artifacts/${appId}/public/decks`);
+                    const publicDecksCol = collection(db, `/artifacts/${appId}/public_decks`);
                     
                     const batch = writeBatch(db);
                     
@@ -1490,7 +1490,7 @@
         async function makeDeckPrivate(deckId) {
             if (!confirm('Are you sure you want to make this deck private? Others will no longer be able to see it.')) return;
             try {
-                const publicDeckQuery = query(collection(db, `/artifacts/${appId}/public/decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
+                const publicDeckQuery = query(collection(db, `/artifacts/${appId}/public_decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
                 const publicDeckSnapshot = await getDocs(publicDeckQuery);
                 
                 const batch = writeBatch(db);
@@ -1513,7 +1513,7 @@
 
         async function importPublicDeck(publicDeckId) {
             try {
-                const publicDeckRef = doc(db, `/artifacts/${appId}/public/decks`, publicDeckId);
+                const publicDeckRef = doc(db, `/artifacts/${appId}/public_decks`, publicDeckId);
                 const publicDeckSnap = await getDoc(publicDeckRef);
 
                 if (publicDeckSnap.exists()) {
@@ -1547,7 +1547,7 @@
             content.innerHTML = `<div class="text-center text-gray-500">Loading public decks...</div>`;
             
             try {
-                const publicDecksCol = collection(db, `/artifacts/${appId}/public/decks`);
+                const publicDecksCol = collection(db, `/artifacts/${appId}/public_decks`);
                 const snapshot = await getDocs(publicDecksCol);
                 const publicDecks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
