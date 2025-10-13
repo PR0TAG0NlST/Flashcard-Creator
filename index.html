@@ -1270,7 +1270,7 @@
                 try {
                     const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
                     // Also delete from public collection if it exists
-                    const publicDeckQuery = query(collection(db, `/artifacts/${appId}/public_decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
+                    const publicDeckQuery = query(collection(db, `artifacts/${appId}/public_decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
                     const publicDeckSnapshot = await getDocs(publicDeckQuery);
                     const batch = writeBatch(db);
                     publicDeckSnapshot.forEach(doc => {
@@ -1565,23 +1565,30 @@
                      const cardCount = deck.cards ? deck.cards.length : 0;
                      const canImport = deck.ownerId !== userId;
                      return `
-                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                            <div class="p-4">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col">
+                            <div class="p-4 flex-grow cursor-pointer public-deck-card" data-id="${deck.id}">
                                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white">${deck.topic}</h3>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">${cardCount} cards</p>
                                 <p class="text-xs text-gray-400 mt-2">By: <span class="font-mono">${deck.ownerId.substring(0,8)}...</span></p>
-                                <div class="mt-4">
-                                     <button class="import-deck-btn w-full px-4 py-2 text-sm font-medium rounded-lg ${canImport ? 'text-white bg-blue-600 hover:bg-blue-700' : 'text-gray-400 bg-gray-200 dark:bg-gray-700 cursor-not-allowed'}" data-id="${deck.id}" ${!canImport ? 'disabled' : ''}>
-                                        ${canImport ? 'Import to My Decks' : 'Your Deck'}
-                                    </button>
-                                </div>
+                            </div>
+                            <div class="p-4 border-t dark:border-gray-700">
+                                <button class="import-deck-btn w-full px-4 py-2 text-sm font-medium rounded-lg ${canImport ? 'text-white bg-blue-600 hover:bg-blue-700' : 'text-gray-400 bg-gray-200 dark:bg-gray-700 cursor-not-allowed'}" data-id="${deck.id}" ${!canImport ? 'disabled' : ''}>
+                                    ${canImport ? 'Import to My Decks' : 'Your Deck'}
+                                </button>
                             </div>
                         </div>`;
                  }).join('');
 
                  content.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">${deckCardsHTML}</div>`;
 
+                document.querySelectorAll('.public-deck-card').forEach(card => {
+                    card.addEventListener('click', (e) => {
+                        renderPublicDeckDetailView(e.currentTarget.dataset.id);
+                    });
+                });
+                
                  document.querySelectorAll('.import-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                     e.stopPropagation();
                      importPublicDeck(e.currentTarget.dataset.id);
                  }));
 
@@ -1589,6 +1596,69 @@
             } catch(e) {
                  console.error("Error fetching public decks: ", e);
                  content.innerHTML = `<div class="text-center text-red-500">Failed to load public decks.</div>`;
+            }
+        }
+
+        async function renderPublicDeckDetailView(publicDeckId) {
+            setHeader('View Public Deck');
+            const content = document.getElementById('app-content');
+            content.innerHTML = `<div class="text-center text-gray-500">Loading deck...</div>`;
+
+            try {
+                const publicDeckRef = doc(db, `artifacts/${appId}/public_decks`, publicDeckId);
+                const publicDeckSnap = await getDoc(publicDeckRef);
+
+                if (!publicDeckSnap.exists()) {
+                    content.innerHTML = `<div class="text-center text-red-500">Could not find this public deck.</div>`;
+                    return;
+                }
+
+                const deck = { id: publicDeckSnap.id, ...publicDeckSnap.data() };
+                const cards = deck.cards || [];
+                setHeader(`Viewing: ${deck.topic}`);
+
+                const canImport = deck.ownerId !== userId;
+
+                content.innerHTML = `
+                    <div class="flex flex-col space-y-4">
+                       <div class="flex items-center justify-between">
+                           <button id="back-to-public-decks" class="flex items-center text-sm text-blue-600 hover:underline">
+                               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                               Back to Public Decks
+                           </button>
+                           <div class="flex space-x-2">
+                               <button id="import-deck-btn-detail" class="px-4 py-2 text-sm font-medium rounded-lg ${canImport ? 'text-white bg-blue-600 hover:bg-blue-700' : 'text-gray-400 bg-gray-200 dark:bg-gray-700 cursor-not-allowed'}" ${!canImport ? 'disabled' : ''}>
+                                   ${canImport ? 'Import to My Decks' : 'This is Your Deck'}
+                               </button>
+                               <button id="start-quiz-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700" ${cards.length === 0 ? 'disabled' : ''}>
+                                   Start Quiz
+                               </button>
+                           </div>
+                       </div>
+                        <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                            <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                                ${cards.length > 0 ? cards.map((card) => `
+                                    <li class="p-4 flex items-center justify-between">
+                                        <div class="flex-1 mr-4">
+                                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
+                                        </div>
+                                    </li>
+                                `).join('') : `<li class="p-6 text-center text-gray-500">This deck has no cards.</li>`}
+                            </ul>
+                        </div>
+                    </div>`;
+
+                document.getElementById('back-to-public-decks').addEventListener('click', renderPublicDecksView);
+                document.getElementById('start-quiz-btn').addEventListener('click', () => renderQuizModal(deck));
+                
+                if (canImport) {
+                    document.getElementById('import-deck-btn-detail').addEventListener('click', () => importPublicDeck(publicDeckId));
+                }
+
+            } catch (e) {
+                console.error("Error fetching public deck details:", e);
+                content.innerHTML = `<div class="text-center text-red-500">Failed to load public deck details.</div>`;
             }
         }
 
