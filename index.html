@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flashcards</title>
+    <title>Study Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -61,7 +61,7 @@
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
         const firebaseConfig = {
@@ -93,20 +93,20 @@
                     <!-- Sidebar -->
                     <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col p-4">
                         <div class="h-16 flex items-center px-2 flex-shrink-0">
-                            <span class="text-2xl font-bold">Flashcards</span>
+                            <span class="text-2xl font-bold">Study Tool</span>
                         </div>
                         <nav id="main-nav" class="flex flex-col space-y-1 flex-shrink-0">
                             <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
                                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
-                                My decks
+                                My Decks
                             </a>
                             <a href="#" id="nav-progress" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
                                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                                 Progress
                             </a>
-                            <a href="#" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
+                            <a href="#" id="nav-public-decks" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
                                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                                Public decks
+                                Public Decks
                             </a>
                         </nav>
                         <div class="space-y-2 pt-2 flex-shrink-0">
@@ -141,7 +141,7 @@
                     <div class="flex-1 flex flex-col overflow-hidden">
                         <header class="h-16 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-6 flex-shrink-0">
                             <div id="main-header">
-                                <h1 class="text-xl font-semibold">My decks</h1>
+                                <h1 class="text-xl font-semibold">My Decks</h1>
                             </div>
                             <div class="flex items-center space-x-4">
                                 <button id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5">
@@ -192,7 +192,7 @@
         function renderDecksView(decks) {
             setActiveNav('nav-my-decks');
             const content = document.getElementById('app-content');
-            setHeader('My decks');
+            setHeader('My Decks');
             const topicStyles = {
                 'Psychology': { color: 'bg-rose-300', icon: '🧠' },
                 'Biology': { color: 'bg-orange-400', icon: '📄' },
@@ -231,6 +231,7 @@
                     ${decks.map(deck => {
                         const style = getTopicStyle(deck.topic);
                         const cardCount = deck.cards ? deck.cards.length : 0;
+                        const isPublic = deck.isPublic || false;
                         return `
                         <div class="deck-card bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden cursor-pointer transform hover:-translate-y-1 transition-transform duration-200" data-id="${deck.id}">
                             <div class="p-4">
@@ -240,6 +241,11 @@
                                         <h3 class="text-lg font-semibold text-gray-800 dark:text-white">${deck.topic}</h3>
                                     </div>
                                     <div class="flex items-center">
+                                         <button class="publish-deck-btn text-gray-400 hover:text-green-500 mr-2" data-id="${deck.id}" data-is-public="${isPublic}">
+                                            ${isPublic ? 
+                                            `<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.72 7 7.92 7 9.5c0 .355.042.709.125 1.055a.8.8 0 01-.84 1.002A5.99 5.99 0 014.002 9.5c0-.99.22-1.93.62-2.775a.795.795 0 01.71-.498zM10 4a6 6 0 00-4.668 9.973.795.795 0 01-.71.498A8.01 8.01 0 012 9.5c0-1.02.213-2 .607-2.887a.8.8 0 011.09-.527A6.009 6.009 0 0110 4zm4.668 5.973a.795.795 0 01.71-.498A8.01 8.01 0 0118 9.5c0-1.02-.213-2-.607-2.887a.8.8 0 01-1.09-.527A6.009 6.009 0 0110 4a6 6 0 00-4.668 9.973.795.795 0 01-.71.498A5.99 5.99 0 0114.002 9.5c0-.99-.22-1.93-.62-2.775a.795.795 0 01.71-.498.8.8 0 01.84 1.002A6.012 6.012 0 0115.668 11.973z" clip-rule="evenodd" />_</svg>` : 
+                                            `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.333 0-6 2.667-6 4s2.667 4 6 4 6-2.667 6-4-2.667-4-6-4zm0 0V6m0 12v-2m-4-2H4m16 0h-2M6.343 6.343L5.636 5.636m12.728 12.728l-.707-.707M6.343 17.657l-.707.707m12.728-12.728l.707-.707"></path></svg>`}
+                                        </button>
                                         <button class="rename-deck-btn text-gray-400 hover:text-blue-500 mr-2" data-id="${deck.id}" data-topic="${deck.topic}">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
                                         </button>
@@ -255,7 +261,7 @@
                 </div>`;
 
             document.querySelectorAll('.deck-card').forEach(card => card.addEventListener('click', (e) => {
-                if (!e.target.closest('.delete-deck-btn') && !e.target.closest('.rename-deck-btn')) {
+                if (!e.target.closest('.delete-deck-btn') && !e.target.closest('.rename-deck-btn') && !e.target.closest('.publish-deck-btn')) {
                     viewDeck(card.dataset.id);
                 }
             }));
@@ -266,6 +272,15 @@
             document.querySelectorAll('.rename-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 renderRenameDeckModal(btn.dataset.id, btn.dataset.topic);
+            }));
+             document.querySelectorAll('.publish-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isPublic = btn.dataset.isPublic === 'true';
+                if (isPublic) {
+                    makeDeckPrivate(btn.dataset.id);
+                } else {
+                    makeDeckPublic(btn.dataset.id);
+                }
             }));
         }
         
@@ -288,7 +303,7 @@
                        <div class="flex items-center justify-between">
                            <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                               Back to Decks
+                               Back to My Decks
                            </button>
                            <div class="flex space-x-2">
                                <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Card</button>
@@ -1233,7 +1248,7 @@
         async function createDeck(topic) {
             try {
                 const decksCol = collection(db, `/artifacts/${appId}/users/${userId}/decks`);
-                await addDoc(decksCol, { topic, cards: [] });
+                await addDoc(decksCol, { topic, cards: [], isPublic: false });
             } catch (error) {
                 console.error("Error creating deck:", error);
             }
@@ -1254,7 +1269,16 @@
             if (confirm('Are you sure you want to delete this deck and all its cards?')) {
                 try {
                     const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
-                    await deleteDoc(deckRef);
+                    // Also delete from public collection if it exists
+                    const publicDeckQuery = query(collection(db, `/artifacts/${appId}/public/decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
+                    const publicDeckSnapshot = await getDocs(publicDeckQuery);
+                    const batch = writeBatch(db);
+                    publicDeckSnapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    batch.delete(deckRef);
+                    await batch.commit();
+
                 } catch (error) {
                     console.error("Error deleting deck:", error);
                 }
@@ -1429,6 +1453,144 @@
                 }
             } catch(e) { console.error("Error deleting topic: ", e); }
         }
+        
+        // --- Public Decks Logic ---
+        async function makeDeckPublic(deckId) {
+            try {
+                const privateDeckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                const privateDeckSnap = await getDoc(privateDeckRef);
+
+                if (privateDeckSnap.exists()) {
+                    const deckData = privateDeckSnap.data();
+                    const publicDecksCol = collection(db, `/artifacts/${appId}/public/decks`);
+                    
+                    const batch = writeBatch(db);
+                    
+                    // Add to public collection
+                    const newPublicDeckRef = doc(publicDecksCol); // Auto-generate ID
+                    batch.set(newPublicDeckRef, {
+                        topic: deckData.topic,
+                        cards: deckData.cards,
+                        ownerId: userId,
+                        originalDeckId: deckId,
+                    });
+
+                    // Update private deck status
+                    batch.update(privateDeckRef, { isPublic: true });
+                    
+                    await batch.commit();
+                    alert('Deck published successfully!');
+                }
+            } catch(e) {
+                console.error("Error making deck public: ", e);
+                alert('Failed to publish deck.');
+            }
+        }
+
+        async function makeDeckPrivate(deckId) {
+            if (!confirm('Are you sure you want to make this deck private? Others will no longer be able to see it.')) return;
+            try {
+                const publicDeckQuery = query(collection(db, `/artifacts/${appId}/public/decks`), where("originalDeckId", "==", deckId), where("ownerId", "==", userId));
+                const publicDeckSnapshot = await getDocs(publicDeckQuery);
+                
+                const batch = writeBatch(db);
+                
+                publicDeckSnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+
+                const privateDeckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                batch.update(privateDeckRef, { isPublic: false });
+                
+                await batch.commit();
+                alert('Deck is now private.');
+
+            } catch(e) {
+                console.error("Error making deck private: ", e);
+                alert('Failed to make deck private.');
+            }
+        }
+
+        async function importPublicDeck(publicDeckId) {
+            try {
+                const publicDeckRef = doc(db, `/artifacts/${appId}/public/decks`, publicDeckId);
+                const publicDeckSnap = await getDoc(publicDeckRef);
+
+                if (publicDeckSnap.exists()) {
+                    const deckData = publicDeckSnap.data();
+                    
+                    // Prevent importing own deck
+                    if (deckData.ownerId === userId) {
+                        alert("You cannot import your own deck.");
+                        return;
+                    }
+                    
+                    const privateDecksCol = collection(db, `/artifacts/${appId}/users/${userId}/decks`);
+                    await addDoc(privateDecksCol, {
+                        topic: `${deckData.topic} (Imported)`,
+                        cards: deckData.cards,
+                        isPublic: false, // Imported decks are private by default
+                    });
+
+                    alert('Deck imported successfully!');
+                }
+            } catch (e) {
+                console.error("Error importing deck:", e);
+                alert('Failed to import deck.');
+            }
+        }
+
+        async function renderPublicDecksView() {
+            setActiveNav('nav-public-decks');
+            setHeader('Public Decks');
+            const content = document.getElementById('app-content');
+            content.innerHTML = `<div class="text-center text-gray-500">Loading public decks...</div>`;
+            
+            try {
+                const publicDecksCol = collection(db, `/artifacts/${appId}/public/decks`);
+                const snapshot = await getDocs(publicDecksCol);
+                const publicDecks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                 if (publicDecks.length === 0) {
+                    content.innerHTML = `
+                        <div class="text-center py-12">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Public Decks Yet</h3>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Be the first to share a deck!</p>
+                        </div>`;
+                    return;
+                }
+
+                 const deckCardsHTML = publicDecks.map(deck => {
+                     const cardCount = deck.cards ? deck.cards.length : 0;
+                     const canImport = deck.ownerId !== userId;
+                     return `
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                            <div class="p-4">
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">${deck.topic}</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">${cardCount} cards</p>
+                                <p class="text-xs text-gray-400 mt-2">By: <span class="font-mono">${deck.ownerId.substring(0,8)}...</span></p>
+                                <div class="mt-4">
+                                     <button class="import-deck-btn w-full px-4 py-2 text-sm font-medium rounded-lg ${canImport ? 'text-white bg-blue-600 hover:bg-blue-700' : 'text-gray-400 bg-gray-200 dark:bg-gray-700 cursor-not-allowed'}" data-id="${deck.id}" ${!canImport ? 'disabled' : ''}>
+                                        ${canImport ? 'Import to My Decks' : 'Your Deck'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>`;
+                 }).join('');
+
+                 content.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">${deckCardsHTML}</div>`;
+
+                 document.querySelectorAll('.import-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                     importPublicDeck(e.currentTarget.dataset.id);
+                 }));
+
+
+            } catch(e) {
+                 console.error("Error fetching public decks: ", e);
+                 content.innerHTML = `<div class="text-center text-red-500">Failed to load public decks.</div>`;
+            }
+        }
 
         function viewDeck(deckId) {
              renderSingleDeckView(deckId);
@@ -1441,7 +1603,7 @@
                 allUserDecks = decks;
                 renderLibrary(decks);
                 const mainHeader = document.querySelector('#main-header h1');
-                if (mainHeader && mainHeader.textContent === 'My decks') {
+                if (mainHeader && mainHeader.textContent === 'My Decks') {
                     renderDecksView(decks);
                 }
             });
@@ -1474,6 +1636,10 @@
             document.getElementById('nav-progress').addEventListener('click', (e) => {
                 e.preventDefault();
                 renderProgressView();
+            });
+             document.getElementById('nav-public-decks').addEventListener('click', (e) => {
+                e.preventDefault();
+                renderPublicDecksView();
             });
 
             document.getElementById('sidebar-add-deck-btn').addEventListener('click', (e) => {
