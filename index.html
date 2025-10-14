@@ -47,6 +47,19 @@
         .card-face-back {
             transform: rotateY(180deg);
         }
+         .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="h-full bg-gray-50 dark:bg-slate-900 overflow-hidden">
@@ -74,6 +87,7 @@
   	  measurementId: "G-DG0MQYCWZC"
         };
         // --- END OF FIREBASE CONFIGURATION ---
+        const geminiApiKey = "AIzaSyCgUaG0LID_C9XbRF1yd1Apo9YiI581LAs";
         
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
@@ -315,7 +329,7 @@
                             <ul class="divide-y divide-gray-200 dark:divide-gray-700">
                                 ${cards.length > 0 ? cards.map((card, index) => `
                                     <li class="p-4 flex items-center justify-between">
-                                        <div class="flex-1 mr-4">
+                                        <div class="flex-1 mr-4 min-w-0">
                                             <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
                                             <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
                                         </div>
@@ -1056,6 +1070,9 @@
                             <button id="bulk-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
                                 Bulk Add
                             </button>
+                             <button id="ai-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
+                                Generate with AI
+                            </button>
                         </nav>
                     </div>
 
@@ -1081,12 +1098,24 @@
                                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Separate cards with a blank line. Separate question and answer with a colon (:).</p>
                             </div>
                         </div>
+                        <!-- AI Add View (Hidden by default) -->
+                        <div id="ai-add-view" class="hidden">
+                             <div>
+                                <label for="ai-topic-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic or Notes</label>
+                                <textarea id="ai-topic-input" rows="10" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter a topic like 'Cellular Respiration' or paste your notes here..."></textarea>
+                                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">The AI will generate flashcards based on your input.</p>
+                                <div id="ai-loader" class="hidden mt-4 flex items-center justify-center">
+                                    <div class="loader"></div>
+                                    <p class="ml-2 text-sm text-gray-500">Generating cards...</p>
+                                </div>
+                            </div>
+                        </div>
                     </form>
                 </div>
             `;
 
             renderModal('add-card-modal', 'Add New Card(s)', modalContent,
-            () => { // onSave logic
+            () => { // onSave logic for Simple and Bulk add
                 const simpleAddView = document.getElementById('simple-add-view');
                 let newCards = [];
 
@@ -1124,37 +1153,76 @@
 
             }, 'Add Card(s)');
 
-            // Add event listeners for tab switching
+            // --- Tab Switching Logic ---
             const simpleTab = document.getElementById('simple-add-tab');
             const bulkTab = document.getElementById('bulk-add-tab');
+            const aiTab = document.getElementById('ai-add-tab');
             const simpleView = document.getElementById('simple-add-view');
             const bulkView = document.getElementById('bulk-add-view');
+            const aiView = document.getElementById('ai-add-view');
+            const saveButton = document.getElementById('modal-save-btn');
+            
+            const allTabs = [simpleTab, bulkTab, aiTab];
+            const allViews = [simpleView, bulkView, aiView];
+            
+            function activateTab(activeTab, activeView) {
+                allTabs.forEach(tab => {
+                    tab.classList.remove('text-blue-600', 'border-blue-600');
+                    tab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
+                });
+                allViews.forEach(view => view.classList.add('hidden'));
 
-            simpleTab.addEventListener('click', () => {
-                // Activate simple tab
-                simpleTab.classList.add('text-blue-600', 'border-blue-600');
-                simpleTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
-                // Deactivate bulk tab
-                bulkTab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
-                bulkTab.classList.remove('text-blue-600', 'border-blue-600');
+                activeTab.classList.add('text-blue-600', 'border-blue-600');
+                activeTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
+                activeView.classList.remove('hidden');
 
-                // Show/hide views
-                simpleView.classList.remove('hidden');
-                bulkView.classList.add('hidden');
-            });
+                if (activeTab === aiTab) {
+                    saveButton.textContent = 'Generate Cards';
+                    saveButton.onclick = () => generateCardsWithAI(deckId);
+                } else {
+                    saveButton.textContent = 'Add Card(s)';
+                    saveButton.onclick = () => {
+                         const simpleAddView = document.getElementById('simple-add-view');
+                        let newCards = [];
 
-            bulkTab.addEventListener('click', () => {
-                // Activate bulk tab
-                bulkTab.classList.add('text-blue-600', 'border-blue-600');
-                bulkTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
-                // Deactivate simple tab
-                simpleTab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
-                simpleTab.classList.remove('text-blue-600', 'border-blue-600');
+                        if (document.getElementById('simple-add-view') && !document.getElementById('simple-add-view').classList.contains('hidden')) {
+                            const question = document.getElementById('card-question').value.trim();
+                            const answer = document.getElementById('card-answer').value.trim();
+                            if (question && answer) {
+                                newCards.push({ question, answer });
+                            }
+                        } else if (document.getElementById('bulk-add-view') && !document.getElementById('bulk-add-view').classList.contains('hidden')) {
+                            const bulkText = document.getElementById('bulk-cards-input').value.trim();
+                            if (bulkText) {
+                                const cardBlocks = bulkText.split('\n\n');
+                                newCards = cardBlocks
+                                    .map(block => {
+                                        if (block.trim() === '') return null;
+                                        const parts = block.split(':');
+                                        if (parts.length >= 2) {
+                                            const question = parts[0].trim();
+                                            const answer = parts.slice(1).join(':').trim();
+                                            if (question && answer) {
+                                                return { question, answer };
+                                            }
+                                        }
+                                        return null;
+                                    })
+                                    .filter(card => card !== null);
+                            }
+                        }
 
-                // Show/hide views
-                bulkView.classList.remove('hidden');
-                simpleView.classList.add('hidden');
-            });
+                        if (newCards.length > 0) {
+                            addMultipleCardsToDeck(deckId, newCards);
+                            document.getElementById('add-card-modal')?.remove();
+                        }
+                    };
+                }
+            }
+            
+            simpleTab.addEventListener('click', () => activateTab(simpleTab, simpleView));
+            bulkTab.addEventListener('click', () => activateTab(bulkTab, bulkView));
+            aiTab.addEventListener('click', () => activateTab(aiTab, aiView));
         }
 
         function renderPublishDeckModal(deckId) {
@@ -1162,11 +1230,28 @@
                 <form id="publish-deck-form">
                     <label for="deck-summary" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deck Summary (Optional)</label>
                     <textarea id="deck-summary" rows="4" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Briefly describe what this deck is about..."></textarea>
-                    <p class="mt-2 text-xs text-gray-500">This summary will be visible to other users in the Public Decks section.</p>
+                    <p class="mt-2 text-xs text-gray-500">If left blank, an AI-generated summary will be created.</p>
+                     <div id="ai-summary-loader" class="hidden mt-4 flex items-center justify-center">
+                        <div class="loader"></div>
+                        <p class="ml-2 text-sm text-gray-500">Generating AI summary...</p>
+                    </div>
                 </form>
             `;
-            renderModal('publish-deck-modal', 'Publish Deck', modalContent, () => {
-                const summary = document.getElementById('deck-summary').value.trim();
+            renderModal('publish-deck-modal', 'Publish Deck', modalContent, async () => {
+                let summary = document.getElementById('deck-summary').value.trim();
+                const loader = document.getElementById('ai-summary-loader');
+                
+                if (!summary) {
+                    loader.classList.remove('hidden');
+                    const deck = allUserDecks.find(d => d.id === deckId);
+                    if (deck && deck.cards.length > 0) {
+                        summary = await generateSummaryWithAI(deck.cards);
+                    } else {
+                        summary = "A collection of flashcards.";
+                    }
+                    loader.classList.add('hidden');
+                }
+                
                 makeDeckPublic(deckId, summary);
                 document.getElementById('publish-deck-modal')?.remove();
             }, 'Publish');
@@ -1367,6 +1452,103 @@
             }
         }
         
+        // --- AI Generation Logic ---
+        async function generateCardsWithAI(deckId) {
+            const topicInput = document.getElementById('ai-topic-input');
+            const loader = document.getElementById('ai-loader');
+            const text = topicInput.value.trim();
+
+            if (!text) {
+                alert("Please enter a topic or some notes for the AI.");
+                return;
+            }
+
+            loader.classList.remove('hidden');
+            const saveButton = document.getElementById('modal-save-btn');
+            saveButton.disabled = true;
+
+            const prompt = `
+                You are an expert flashcard creator. Based on the following topic or notes, generate a list of 5 to 10 flashcards.
+                The response MUST be a valid JSON array of objects, where each object has a "question" and an "answer" key.
+                Do NOT include any other text, explanations, or markdown formatting.
+                The questions should be clear and concise. The answers should be accurate and to the point.
+                Topic/Notes:
+                ---
+                ${text}
+                ---
+            `;
+
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                         generationConfig: {
+                            // Enforce JSON output
+                            responseMimeType: "application/json",
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API error: ${response.status} - ${errorBody}`);
+                }
+
+                const result = await response.json();
+                const aiResponseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!aiResponseText) {
+                    throw new Error("The AI returned an empty response.");
+                }
+                
+                const newCards = JSON.parse(aiResponseText);
+
+                if (Array.isArray(newCards) && newCards.length > 0) {
+                    await addMultipleCardsToDeck(deckId, newCards);
+                    document.getElementById('add-card-modal')?.remove();
+                } else {
+                    throw new Error("The AI did not return a valid array of cards.");
+                }
+
+            } catch (error) {
+                console.error("Error generating cards with AI:", error);
+                alert(`Failed to generate cards. Please try again. Error: ${error.message}`);
+            } finally {
+                loader.classList.add('hidden');
+                saveButton.disabled = false;
+            }
+        }
+
+        async function generateSummaryWithAI(cards) {
+            const cardContent = cards.slice(0, 10).map(c => `Q: ${c.question}\nA: ${c.answer}`).join('\n\n'); // Use up to 10 cards for summary
+            const prompt = `Based on the following flashcards, generate a concise, one-sentence summary for the deck that would be appealing to other students:\n\n${cardContent}`;
+
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+
+                if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+
+                const result = await response.json();
+                const summary = result.candidates?.[0]?.content?.parts?.[0]?.text || "A collection of flashcards.";
+                return summary.trim().replace(/"/g, ''); // Remove quotes from summary
+
+            } catch (error) {
+                console.error("AI summary generation failed:", error);
+                return "A helpful collection of flashcards."; // Return a default summary on error
+            }
+        }
+        
         // --- Progress Feature Data Logic ---
         async function addProgressSubject(name) {
             try {
@@ -1516,11 +1698,12 @@
                     
                     await batch.commit();
                     alert('Deck published successfully!');
-                    fetchAndDisplayDecks(); // Force re-render
                 }
             } catch(e) {
                 console.error("Error making deck public: ", e);
                 alert('Failed to publish deck.');
+            } finally {
+                fetchAndDisplayDecks(); // Force re-render regardless of success or failure
             }
         }
 
@@ -1541,11 +1724,12 @@
                 
                 await batch.commit();
                 alert('Deck is now private.');
-                fetchAndDisplayDecks(); // Force re-render
 
             } catch(e) {
                 console.error("Error making deck private: ", e);
                 alert('Failed to make deck private.');
+            } finally {
+                fetchAndDisplayDecks(); // Force re-render
             }
         }
 
@@ -1713,7 +1897,7 @@
                             <ul class="divide-y divide-gray-200 dark:divide-gray-700">
                                 ${cards.length > 0 ? cards.map((card) => `
                                     <li class="p-4 flex items-center justify-between">
-                                        <div class="flex-1 mr-4">
+                                        <div class="flex-1 mr-4 min-w-0">
                                             <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
                                             <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
                                         </div>
