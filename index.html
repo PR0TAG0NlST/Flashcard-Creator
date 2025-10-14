@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Tool</title>
+    <title>Synapse</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -82,6 +82,7 @@
         let allUserDecks = [];
         let progressSubjects = [];
         let progressChartInstance = null;
+        let allPublicDecks = [];
 
 
         // --- UI RENDERING ---
@@ -93,7 +94,7 @@
                     <!-- Sidebar -->
                     <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col p-4">
                         <div class="h-16 flex items-center px-2 flex-shrink-0">
-                            <span class="text-2xl font-bold">Study Tool</span>
+                            <span class="text-2xl font-bold">Synapse</span>
                         </div>
                         <nav id="main-nav" class="flex flex-col space-y-1 flex-shrink-0">
                             <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
@@ -279,7 +280,7 @@
                 if (isPublic) {
                     makeDeckPrivate(btn.dataset.id);
                 } else {
-                    makeDeckPublic(btn.dataset.id);
+                    renderPublishDeckModal(btn.dataset.id);
                 }
             }));
         }
@@ -693,7 +694,7 @@
             }
 
             progressChartInstance = new Chart(ctx, {
-                type: 'pie',
+                type: 'doughnut',
                 data: {
                     labels: labels,
                     datasets: [{
@@ -705,6 +706,7 @@
                 },
                 options: {
                     responsive: true,
+                    cutout: '60%',
                     plugins: {
                         legend: {
                             position: 'top',
@@ -735,7 +737,25 @@
                             }
                         }
                     }
-                }
+                },
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: (chart) => {
+                        const { width, height, ctx } = chart;
+                        ctx.restore();
+                        const fontSize = (height / 114).toFixed(2);
+                        ctx.font = `bold ${fontSize}em Inter, sans-serif`;
+                        ctx.textBaseline = 'middle';
+                        
+                        const text = `${Math.round(totalCompletedPercentage)}%`;
+                        const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                        const textY = height / 2;
+                        
+                        ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#fff' : '#333';
+                        ctx.fillText(text, textX, textY);
+                        ctx.save();
+                    }
+                }]
             });
         }
 
@@ -1137,6 +1157,21 @@
             });
         }
 
+        function renderPublishDeckModal(deckId) {
+            const modalContent = `
+                <form id="publish-deck-form">
+                    <label for="deck-summary" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deck Summary (Optional)</label>
+                    <textarea id="deck-summary" rows="4" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Briefly describe what this deck is about..."></textarea>
+                    <p class="mt-2 text-xs text-gray-500">This summary will be visible to other users in the Public Decks section.</p>
+                </form>
+            `;
+            renderModal('publish-deck-modal', 'Publish Deck', modalContent, () => {
+                const summary = document.getElementById('deck-summary').value.trim();
+                makeDeckPublic(deckId, summary);
+                document.getElementById('publish-deck-modal')?.remove();
+            }, 'Publish');
+        }
+
         function renderQuizModal(deck) {
             let currentCardIndex = 0;
             
@@ -1455,7 +1490,7 @@
         }
         
         // --- Public Decks Logic ---
-        async function makeDeckPublic(deckId) {
+        async function makeDeckPublic(deckId, summary) {
             try {
                 const privateDeckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
                 const privateDeckSnap = await getDoc(privateDeckRef);
@@ -1470,6 +1505,7 @@
                     const newPublicDeckRef = doc(publicDecksCol); // Auto-generate ID
                     batch.set(newPublicDeckRef, {
                         topic: deckData.topic,
+                        summary: summary,
                         cards: deckData.cards,
                         ownerId: userId,
                         originalDeckId: deckId,
@@ -1480,6 +1516,7 @@
                     
                     await batch.commit();
                     alert('Deck published successfully!');
+                    fetchAndDisplayDecks(); // Force re-render
                 }
             } catch(e) {
                 console.error("Error making deck public: ", e);
@@ -1504,6 +1541,7 @@
                 
                 await batch.commit();
                 alert('Deck is now private.');
+                fetchAndDisplayDecks(); // Force re-render
 
             } catch(e) {
                 console.error("Error making deck private: ", e);
@@ -1530,6 +1568,7 @@
                         topic: `${deckData.topic} (Imported)`,
                         cards: deckData.cards,
                         isPublic: false, // Imported decks are private by default
+                        summary: deckData.summary || ''
                     });
 
                     alert('Deck imported successfully!');
@@ -1549,54 +1588,84 @@
             try {
                 const publicDecksCol = collection(db, `artifacts/${appId}/public_decks`);
                 const snapshot = await getDocs(publicDecksCol);
-                const publicDecks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allPublicDecks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                 if (publicDecks.length === 0) {
-                    content.innerHTML = `
-                        <div class="text-center py-12">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Public Decks Yet</h3>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Be the first to share a deck!</p>
-                        </div>`;
-                    return;
-                }
-
-                 const deckCardsHTML = publicDecks.map(deck => {
-                     const cardCount = deck.cards ? deck.cards.length : 0;
-                     const canImport = deck.ownerId !== userId;
-                     return `
-                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col">
-                            <div class="p-4 flex-grow cursor-pointer public-deck-card" data-id="${deck.id}">
-                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">${deck.topic}</h3>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">${cardCount} cards</p>
-                                <p class="text-xs text-gray-400 mt-2">By: <span class="font-mono">${deck.ownerId.substring(0,8)}...</span></p>
-                            </div>
-                            <div class="p-4 border-t dark:border-gray-700">
-                                <button class="import-deck-btn w-full px-4 py-2 text-sm font-medium rounded-lg ${canImport ? 'text-white bg-blue-600 hover:bg-blue-700' : 'text-gray-400 bg-gray-200 dark:bg-gray-700 cursor-not-allowed'}" data-id="${deck.id}" ${!canImport ? 'disabled' : ''}>
-                                    ${canImport ? 'Import to My Decks' : 'Your Deck'}
-                                </button>
-                            </div>
-                        </div>`;
-                 }).join('');
-
-                 content.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">${deckCardsHTML}</div>`;
-
-                document.querySelectorAll('.public-deck-card').forEach(card => {
-                    card.addEventListener('click', (e) => {
-                        renderPublicDeckDetailView(e.currentTarget.dataset.id);
-                    });
-                });
-                
-                 document.querySelectorAll('.import-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
-                     e.stopPropagation();
-                     importPublicDeck(e.currentTarget.dataset.id);
-                 }));
-
+                displayPublicDecks(allPublicDecks);
 
             } catch(e) {
                  console.error("Error fetching public decks: ", e);
                  content.innerHTML = `<div class="text-center text-red-500">Failed to load public decks.</div>`;
             }
+        }
+        
+        function displayPublicDecks(decksToDisplay) {
+            const content = document.getElementById('app-content');
+
+             if (allPublicDecks.length === 0 && decksToDisplay.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-12">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Public Decks Yet</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Be the first to share a deck!</p>
+                    </div>`;
+                return;
+            }
+            
+            const searchBarHTML = `
+                <div class="mb-6 relative">
+                    <input type="text" id="public-deck-search" placeholder="Search by topic or summary..." class="w-full pl-10 pr-4 py-2 border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-blue-500 focus:border-blue-500">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                </div>`;
+
+             const deckCardsHTML = decksToDisplay.map(deck => {
+                 const cardCount = deck.cards ? deck.cards.length : 0;
+                 const canImport = deck.ownerId !== userId;
+                 const summary = deck.summary || 'No summary provided.';
+                 return `
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col">
+                        <div class="p-4 flex-grow cursor-pointer public-deck-card" data-id="${deck.id}">
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white truncate">${deck.topic}</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">${cardCount} cards</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 mt-2 h-10 overflow-hidden text-ellipsis">${summary}</p>
+                            <p class="text-xs text-gray-400 mt-2">By: <span class="font-mono">${deck.ownerId.substring(0,8)}...</span></p>
+                        </div>
+                        <div class="p-4 border-t dark:border-gray-700">
+                            <button class="import-deck-btn w-full px-4 py-2 text-sm font-medium rounded-lg ${canImport ? 'text-white bg-blue-600 hover:bg-blue-700' : 'text-gray-400 bg-gray-200 dark:bg-gray-700 cursor-not-allowed'}" data-id="${deck.id}" ${!canImport ? 'disabled' : ''}>
+                                ${canImport ? 'Import to My Decks' : 'Your Deck'}
+                            </button>
+                        </div>
+                    </div>`;
+             }).join('');
+
+             content.innerHTML = `${searchBarHTML}<div id="public-decks-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">${deckCardsHTML}</div>`;
+
+            document.getElementById('public-deck-search').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const currentSearchValue = e.target.value;
+                const filteredDecks = allPublicDecks.filter(deck => 
+                    deck.topic.toLowerCase().includes(searchTerm) || 
+                    (deck.summary && deck.summary.toLowerCase().includes(searchTerm))
+                );
+                displayPublicDecks(filteredDecks); // This re-renders the whole view
+                const searchInput = document.getElementById('public-deck-search');
+                if(searchInput) {
+                    searchInput.value = currentSearchValue; // Restore search term
+                    searchInput.focus(); // Restore focus
+                }
+            });
+
+            document.querySelectorAll('.public-deck-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    renderPublicDeckDetailView(e.currentTarget.dataset.id);
+                });
+            });
+            
+             document.querySelectorAll('.import-deck-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                 e.stopPropagation();
+                 importPublicDeck(e.currentTarget.dataset.id);
+             }));
         }
 
         async function renderPublicDeckDetailView(publicDeckId) {
@@ -1615,6 +1684,7 @@
 
                 const deck = { id: publicDeckSnap.id, ...publicDeckSnap.data() };
                 const cards = deck.cards || [];
+                const summary = deck.summary || 'No summary provided.';
                 setHeader(`Viewing: ${deck.topic}`);
 
                 const canImport = deck.ownerId !== userId;
@@ -1634,6 +1704,10 @@
                                    Start Quiz
                                </button>
                            </div>
+                       </div>
+                       <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                            <h4 class="font-semibold mb-2">Summary</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">${summary}</p>
                        </div>
                         <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
                             <ul class="divide-y divide-gray-200 dark:divide-gray-700">
