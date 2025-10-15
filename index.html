@@ -97,6 +97,8 @@
         let progressSubjects = [];
         let progressChartInstance = null;
         let allPublicDecks = [];
+        let chatHistory = [];
+
 
         // --- FUNCTION DECLARATIONS (ORDERED TO PREVENT REFERENCE ERRORS) ---
 
@@ -604,7 +606,7 @@
                 document.getElementById('publish-deck-modal')?.remove();
             }, 'Publish');
         }
-
+        
         // --- VIEWS & LAYOUT ---
 
         function renderLoginView() {
@@ -1389,7 +1391,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="mt-6 flex space-x-4">
+                     <div id="explain-btn-container" class="h-12 mt-4 flex justify-center items-center">
+                        <!-- Explain button will be dynamically added here -->
+                    </div>
+                    <div class="mt-2 flex items-center justify-center space-x-4">
                         <button id="prev-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600" ${index === 0 ? 'disabled' : ''}>Previous</button>
                         <button id="flip-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600">Flip</button>
                         <button id="next-card-btn" class="px-6 py-2 rounded-lg bg-blue-600 text-white">Next</button>
@@ -1397,9 +1402,23 @@
                 `;
 
                 const cardElement = document.getElementById('quiz-card');
+                const explainContainer = document.getElementById('explain-btn-container');
                 
                 function flipCard() {
                     cardElement.classList.toggle('is-flipped');
+                     if (cardElement.classList.contains('is-flipped')) {
+                        explainContainer.innerHTML = `
+                            <button id="explain-card-btn" class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2V10a2 2 0 012-2h8z"></path></svg>
+                                Explain
+                            </button>`;
+                        document.getElementById('explain-card-btn').addEventListener('click', (e) => {
+                            e.stopPropagation(); // Prevent quiz modal from handling this click
+                            renderChatbotModal(cardData);
+                        });
+                    } else {
+                        explainContainer.innerHTML = '';
+                    }
                 }
 
                 cardElement.addEventListener('click', flipCard);
@@ -1453,7 +1472,45 @@
                 }
             });
         }
+        
+        function renderChatbotModal(cardData) {
+            chatHistory = []; // Reset history for each new chat
 
+            const modalContent = `
+                <div class="flex flex-col h-[60vh]">
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <!-- Chat messages will be rendered here -->
+                    </div>
+                    <div class="p-4 border-t dark:border-gray-700 flex items-center">
+                        <input type="text" id="chat-input" class="flex-1 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Ask a follow-up question...">
+                        <button id="chat-send-btn" class="ml-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                            Send
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            renderModal('chatbot-modal', 'AI Tutor', modalContent, () => {}, '');
+            const chatbotModal = document.getElementById('chatbot-modal');
+            chatbotModal.querySelector('#modal-save-btn').style.display = 'none';
+            chatbotModal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none'; // Hide footer cancel button
+
+            const chatInput = document.getElementById('chat-input');
+            const chatSendBtn = document.getElementById('chat-send-btn');
+            
+            chatSendBtn.addEventListener('click', handleUserMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleUserMessage();
+                }
+            });
+
+            // Start the conversation
+            const initialPrompt = `Explain this to me in simple terms. Question: "${cardData.question}", Answer: "${cardData.answer}"`;
+            addUserMessageToChat(initialPrompt, true); // Add user message visually but hide it
+            getAIResponse(initialPrompt);
+        }
+        
         function setHeader(title) {
             const header = document.getElementById('main-header');
             if(header) header.innerHTML = `<h1 class="text-xl font-semibold">${title}</h1>`;
@@ -1619,7 +1676,113 @@
             }
         }
         
-        // --- AI Generation Logic ---
+        // --- AI Generation & Chatbot Logic ---
+
+        function formatAIResponse(text) {
+            // Replace **text** with <strong>text</strong>
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Split text into paragraphs based on double newlines
+            const paragraphs = formattedText.split(/\n\s*\n/);
+
+            return paragraphs.map(para => {
+                const lines = para.split('\n');
+                // Check if all non-empty lines in the paragraph start with '* '
+                const isList = lines.filter(line => line.trim() !== '').every(line => line.trim().startsWith('* '));
+
+                if (isList && lines.length > 0) {
+                    const listItems = lines.map(line => `<li>${line.trim().substring(2).trim()}</li>`).join('');
+                    return `<ul class="list-disc list-inside space-y-2 my-2">${listItems}</ul>`;
+                } else {
+                    // It's a regular paragraph, just join lines with line breaks and wrap in a p tag
+                    return `<p>${para.replace(/\n/g, '<br>')}</p>`;
+                }
+            }).join('');
+        }
+
+        function addUserMessageToChat(message, isHidden = false) {
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages && !isHidden) {
+                const messageEl = document.createElement('div');
+                messageEl.className = 'flex justify-end';
+                messageEl.innerHTML = `<div class="bg-blue-500 text-white p-3 rounded-lg max-w-xs">${message}</div>`;
+                chatMessages.appendChild(messageEl);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            chatHistory.push({ role: 'user', parts: [{ text: message }] });
+        }
+
+        function addBotMessageToChat(message) {
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages) {
+                 // Remove any existing loader
+                const existingLoader = chatMessages.querySelector('.loader-container');
+                if (existingLoader) existingLoader.remove();
+
+                const formattedMessage = formatAIResponse(message);
+                const messageEl = document.createElement('div');
+                messageEl.className = 'flex justify-start';
+                messageEl.innerHTML = `<div class="bg-gray-200 dark:bg-gray-600 p-3 rounded-lg max-w-xs text-sm">${formattedMessage}</div>`;
+                chatMessages.appendChild(messageEl);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            chatHistory.push({ role: 'model', parts: [{ text: message }] });
+        }
+        
+        function addBotLoader() {
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages) {
+                const loaderEl = document.createElement('div');
+                loaderEl.className = 'flex justify-start loader-container';
+                loaderEl.innerHTML = `<div class="bg-gray-200 dark:bg-gray-600 p-3 rounded-lg max-w-xs"><div class="loader" style="width:20px; height:20px;"></div></div>`;
+                chatMessages.appendChild(loaderEl);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+
+        async function handleUserMessage() {
+            const chatInput = document.getElementById('chat-input');
+            const message = chatInput.value.trim();
+            if (message) {
+                addUserMessageToChat(message);
+                chatInput.value = '';
+                await getAIResponse(message);
+            }
+        }
+
+        async function getAIResponse(prompt) {
+            addBotLoader();
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: chatHistory, // Send the whole history
+                        systemInstruction: {
+                            parts: [{ text: "You are a helpful and friendly AI tutor. Your goal is to explain topics clearly and concisely to a student. Keep your responses focused on the student's question." }]
+                        },
+                    })
+                });
+
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
+                
+                const result = await response.json();
+                const botResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (botResponse) {
+                    addBotMessageToChat(botResponse);
+                } else {
+                    addBotMessageToChat("I'm not sure how to respond to that. Could you ask in a different way?");
+                }
+
+            } catch (error) {
+                console.error("AI chat error:", error);
+                addBotMessageToChat("Sorry, I encountered an error. Please try again.");
+            }
+        }
+
         async function generateCardsWithAI(deckId) {
             const topicInput = document.getElementById('ai-topic-input');
             const cardCountInput = document.getElementById('ai-card-count');
@@ -2151,7 +2314,7 @@
             });
         }
         
-        // --- INITIALIZATION ---
+        // --- EVENT LISTENERS & INITIALIZATION ---
         
         function setupEventListeners() {
             // Sidebar listeners
