@@ -1190,10 +1190,16 @@
                         </div>
                         <!-- AI Add View (Hidden by default) -->
                         <div id="ai-add-view" class="hidden">
-                             <div>
-                                <label for="ai-topic-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic or Notes</label>
-                                <textarea id="ai-topic-input" rows="10" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter a topic like 'Cellular Respiration' or paste your notes here..."></textarea>
-                                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">The AI will generate flashcards based on your input.</p>
+                             <div class="space-y-4">
+                                <div>
+                                    <label for="ai-topic-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic or Notes</label>
+                                    <textarea id="ai-topic-input" rows="8" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter a topic like 'Cellular Respiration' or paste your notes here..."></textarea>
+                                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">The AI will generate flashcards based on your input.</p>
+                                </div>
+                                <div>
+                                    <label for="ai-card-count" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Cards: <span id="ai-card-count-display" class="font-bold text-blue-600 dark:text-blue-400">8</span></label>
+                                    <input type="range" id="ai-card-count" name="ai-card-count" min="3" max="20" value="8" class="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+                                </div>
                                 <div id="ai-loader" class="hidden mt-4 flex items-center justify-center">
                                     <div class="loader"></div>
                                     <p class="ml-2 text-sm text-gray-500">Generating cards...</p>
@@ -1313,6 +1319,15 @@
             simpleTab.addEventListener('click', () => activateTab(simpleTab, simpleView));
             bulkTab.addEventListener('click', () => activateTab(bulkTab, bulkView));
             aiTab.addEventListener('click', () => activateTab(aiTab, aiView));
+
+            // Add event listener for the range slider
+            const cardCountSlider = document.getElementById('ai-card-count');
+            const cardCountDisplay = document.getElementById('ai-card-count-display');
+            if(cardCountSlider && cardCountDisplay) {
+                cardCountSlider.addEventListener('input', () => {
+                    cardCountDisplay.textContent = cardCountSlider.value;
+                });
+            }
         }
 
         function renderPublishDeckModal(deckId) {
@@ -1377,7 +1392,7 @@
                 quizContent.innerHTML = `
                     <p class="text-sm text-gray-500 mb-2">${index + 1} / ${deck.cards.length}</p>
                     <div class="scene w-full h-64">
-                        <div id="quiz-card" class="card relative w-full h-full">
+                        <div id="quiz-card" class="card relative w-full h-full cursor-pointer">
                             <div class="card-face absolute w-full h-full flex items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-lg">
                                 <p class="text-xl text-center">${cardData.question}</p>
                             </div>
@@ -1387,16 +1402,24 @@
                         </div>
                     </div>
                     <div class="mt-6 flex space-x-4">
+                        <button id="prev-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600 disabled:opacity-50" ${index === 0 ? 'disabled' : ''}>Previous</button>
                         <button id="flip-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600">Flip</button>
                         <button id="next-card-btn" class="px-6 py-2 rounded-lg bg-blue-600 text-white">Next</button>
                     </div>
                 `;
 
                 const cardElement = document.getElementById('quiz-card');
+                cardElement.addEventListener('click', () => cardElement.classList.toggle('is-flipped'));
                 document.getElementById('flip-card-btn').addEventListener('click', () => cardElement.classList.toggle('is-flipped'));
                 document.getElementById('next-card-btn').addEventListener('click', () => {
                     currentCardIndex++;
                     showCard(currentCardIndex);
+                });
+                document.getElementById('prev-card-btn').addEventListener('click', () => {
+                    if (currentCardIndex > 0) {
+                        currentCardIndex--;
+                        showCard(currentCardIndex);
+                    }
                 });
             }
 
@@ -1603,8 +1626,10 @@
         // --- AI Generation Logic ---
         async function generateCardsWithAI(deckId) {
             const topicInput = document.getElementById('ai-topic-input');
+            const cardCountInput = document.getElementById('ai-card-count');
             const loader = document.getElementById('ai-loader');
             const text = topicInput.value.trim();
+            const cardCount = cardCountInput ? parseInt(cardCountInput.value, 10) : 8;
 
             if (!text) {
                 alert("Please enter a topic or some notes for the AI.");
@@ -1616,7 +1641,7 @@
             saveButton.disabled = true;
 
             const prompt = `
-                You are an expert flashcard creator. Based on the following topic or notes, generate a list of 5 to 10 flashcards.
+                You are an expert flashcard creator. Based on the following topic or notes, generate a list of exactly ${cardCount} flashcards.
                 The response MUST be a valid JSON array of objects, where each object has a "question" and an "answer" key.
                 Do NOT include any other text, explanations, or markdown formatting.
                 The questions should be clear and concise. The answers should be accurate and to the point.
