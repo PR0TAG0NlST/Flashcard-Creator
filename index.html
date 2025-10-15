@@ -611,8 +611,14 @@
                         </div>
                     </summary>
                     <div class="p-4 border-t dark:border-gray-600">
-                        <ul class="space-y-2 mb-4">${topicItems}</ul>
-                        <button class="add-topic-to-unit-btn text-sm text-blue-600 hover:underline" data-unit-index="${unitIndex}">+ Add Topic(s)</button>
+                        <details class="group" ${topics.length > 0 ? 'open' : ''}>
+                            <summary class="list-none cursor-pointer flex justify-between items-center text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                                <span>${topics.length} Topic(s)</span>
+                                <svg class="w-4 h-4 transform transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </summary>
+                            <ul class="mt-2 space-y-2 mb-4">${topicItems}</ul>
+                        </details>
+                        <button class="add-topic-to-unit-btn text-sm text-blue-600 hover:underline mt-4" data-unit-index="${unitIndex}">+ Add Topic(s)</button>
                     </div>
                 </details>`;
             }).join('');
@@ -798,7 +804,7 @@
             }
 
             progressChartInstance = new Chart(ctx, {
-                type: 'doughnut',
+                type: 'pie',
                 data: {
                     labels: labels,
                     datasets: [{
@@ -810,7 +816,6 @@
                 },
                 options: {
                     responsive: true,
-                    cutout: '60%',
                     plugins: {
                         legend: {
                             position: 'top',
@@ -841,25 +846,7 @@
                             }
                         }
                     }
-                },
-                plugins: [{
-                    id: 'centerText',
-                    beforeDraw: (chart) => {
-                        const { width, height, ctx } = chart;
-                        ctx.restore();
-                        const fontSize = (height / 114).toFixed(2);
-                        ctx.font = `bold ${fontSize}em Inter, sans-serif`;
-                        ctx.textBaseline = 'middle';
-                        
-                        const text = `${Math.round(totalCompletedPercentage)}%`;
-                        const textX = Math.round((width - ctx.measureText(text).width) / 2);
-                        const textY = height / 2;
-                        
-                        ctx.fillStyle = document.documentElement.classList.contains('dark') ? '#fff' : '#333';
-                        ctx.fillText(text, textX, textY);
-                        ctx.save();
-                    }
-                }]
+                }
             });
         }
 
