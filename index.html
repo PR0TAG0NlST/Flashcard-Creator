@@ -663,12 +663,6 @@
                 renderAddTopicModal(subjectId, unitIndex);
             }));
 
-            document.querySelectorAll('#unit-list details').forEach(detailElement => {
-                const unitIndex = parseInt(detailElement.querySelector('.rename-unit-btn').dataset.unitIndex);
-                detailElement.addEventListener('mouseenter', () => drawIndividualUnitPieChart(units[unitIndex]));
-                detailElement.addEventListener('mouseleave', () => drawUnitBasedPieChart(subject));
-            });
-
             document.querySelectorAll('.rename-unit-btn').forEach(btn => btn.addEventListener('click', e => {
                 e.stopPropagation();
                 const unitIndex = parseInt(e.currentTarget.dataset.unitIndex);
