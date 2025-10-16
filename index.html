@@ -1851,28 +1851,26 @@ async function createUserProfile(user, username) {
                         throw new Error("Username is already taken.");
                     }
                     
-                    // --- CORRECTED LOGIC ---
                     const oldUsernameRef = doc(db, `artifacts/${appId}/usernames`, oldUsername.toLowerCase());
                     const oldUsernameDoc = await transaction.get(oldUsernameRef);
 
                     // 2. Only check and delete the old username document IF it exists
                     if (oldUsernameDoc.exists()) {
-                        // If it exists, we must verify ownership before deleting
                         if (oldUsernameDoc.data().userId !== userId) {
                             throw new Error("Cannot change a username you don't own due to a data conflict.");
                         }
-                        // If we own it, delete it
                         transaction.delete(oldUsernameRef);
                     }
-                    // If the old doc doesn't exist, we can just proceed.
-                    // --- END OF CORRECTION ---
                     
                     // 3. Create the new username document
                     transaction.set(newUsernameRef, { userId: userId });
 
-                    // 4. Update the main user document for searching
+                    // --- START OF FIX ---
+                    // 4. Update (or create) the main user document for searching
                     const userRef = doc(db, `/artifacts/${appId}/users`, userId);
-                    transaction.update(userRef, { username: newUsername });
+                    // Use set with merge:true instead of update
+                    transaction.set(userRef, { username: newUsername }, { merge: true });
+                    // --- END OF FIX ---
 
                     // 5. Update the profile subcollection for display
                     const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
