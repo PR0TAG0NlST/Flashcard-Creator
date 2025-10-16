@@ -2977,7 +2977,9 @@ async function createUserProfile(user, username) {
             try {
                 await batch.commit();
                 console.log("User unfollowed successfully!");
-            } catch (error) console.error("Error unfollowing user: ", error);
+            } catch (error) { // ADDED BRACES HERE
+                console.error("Error unfollowing user: ", error);
+            } // AND HERE
         }
 
         async function searchUsers(searchTerm) {
