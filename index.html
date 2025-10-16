@@ -1839,8 +1839,7 @@ async function createUserProfile(user, username) {
             const oldUsername = userProfile.username;
 
             if (oldUsername.toLowerCase() === newUsername.toLowerCase()) {
-                // No change needed if username is the same (case-insensitive)
-                return;
+                return; // No change needed
             }
 
             try {
@@ -1848,30 +1847,39 @@ async function createUserProfile(user, username) {
                     // Check if the new username is already taken
                     const newUsernameRef = doc(db, `artifacts/${appId}/usernames`, newUsername.toLowerCase());
                     const newUsernameDoc = await transaction.get(newUsernameRef);
-
                     if (newUsernameDoc.exists()) {
                         throw new Error("Username is already taken.");
                     }
                     
-                    // 1. Delete the old username document
+                    // --- START OF FIX ---
+                    // 1. Read the old username document so security rules can verify ownership on delete.
                     const oldUsernameRef = doc(db, `artifacts/${appId}/usernames`, oldUsername.toLowerCase());
+                    const oldUsernameDoc = await transaction.get(oldUsernameRef);
+
+                    // Optional but good practice: Client-side check for ownership
+                    if (!oldUsernameDoc.exists() || oldUsernameDoc.data().userId !== userId) {
+                        throw new Error("Cannot change a username that you don't own.");
+                    }
+                    // --- END OF FIX ---
+                    
+                    // 2. Delete the old username document
                     transaction.delete(oldUsernameRef);
                     
-                    // 2. Create the new username document
+                    // 3. Create the new username document
                     transaction.set(newUsernameRef, { userId: userId });
 
-                    // 3. Update the main user document
+                    // 4. Update the main user document
                     const userRef = doc(db, `/artifacts/${appId}/users`, userId);
                     transaction.update(userRef, { username: newUsername });
 
-                    // 4. Update the profile subcollection
+                    // 5. Update the profile subcollection
                     const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
                     transaction.update(profileRef, { username: newUsername });
                 });
-                alert('Profile updated successfully!'); // Give user feedback
+                alert('Profile updated successfully!');
             } catch (error) {
                 console.error("Error updating user profile:", error);
-                alert(`Error: ${error.message}`); // Show specific error
+                alert(`Error: ${error.message}`);
             }
         }
 
