@@ -3218,13 +3218,58 @@ async function createUserProfile(user, username) {
         }
 
         async function renderFollowListModal(listType, targetUserId) {
-            const listName = listType.toLowerCase();
-            const q = collection(db, `artifacts/${appId}/users/${targetUserId}/${listName}`);
-            const snapshot = await getDocs(q);
-            const userIds = snapshot.docs.map(doc => doc.id);
+            const listName = listType.toLowerCase(); // 'followers' or 'following'
+            const modalTitle = `Users ${listName === 'followers' ? 'Following' : 'Followed by'} ${targetUserId === userId ? 'You' : 'this User'}`;
             
-            console.log(`User IDs in ${listType} list:`, userIds);
-            renderPlaceholderModal(`viewing a list of ${listType}`);
+            // Show a loading state immediately
+            renderModal('follow-list-modal', modalTitle, `<div class="text-center text-gray-500">Loading...</div>`, () => {}, '');
+            const modal = document.getElementById('follow-list-modal');
+            modal.querySelector('#modal-save-btn').style.display = 'none';
+            modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
+
+            try {
+                // 1. Get the list of user IDs
+                const listQuery = collection(db, `artifacts/${appId}/users/${targetUserId}/${listName}`);
+                const listSnapshot = await getDocs(listQuery);
+                const userIds = listSnapshot.docs.map(doc => doc.id);
+
+                let modalContentHTML = '';
+                if (userIds.length === 0) {
+                    modalContentHTML = `<p class="text-center text-gray-500">No users found in this list.</p>`;
+                } else {
+                    // 2. Fetch the profile data for each user ID
+                    const userDocs = await Promise.all(userIds.map(id => getDoc(doc(db, `artifacts/${appId}/users`, id))));
+                    const users = userDocs.map(docSnap => ({
+                        id: docSnap.id,
+                        username: docSnap.exists() ? docSnap.data().username : 'Unknown User'
+                    }));
+
+                    modalContentHTML = `
+                        <ul class="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto">
+                            ${users.map(user => `
+                                <li class="p-3 flex items-center justify-between">
+                                    <span class="font-medium">${user.username}</span>
+                                    <a href="${window.location.pathname}?profile=${user.id}" class="view-profile-link text-sm text-blue-500 hover:underline">View Profile</a>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                }
+                
+                // 3. Update the modal with the final list
+                modal.querySelector('.p-6').innerHTML = modalContentHTML;
+                modal.querySelectorAll('.view-profile-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        window.location.href = e.currentTarget.href;
+                        window.location.reload(); // Reload to view the new profile
+                    });
+                });
+
+            } catch (error) {
+                console.error(`Error fetching ${listType} list:`, error);
+                modal.querySelector('.p-6').innerHTML = `<p class="text-center text-red-500">Could not load list.</p>`;
+            }
         }
     </script>
 </body>
