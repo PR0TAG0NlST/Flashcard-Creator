@@ -74,7 +74,7 @@
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch, getDocs, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch, getDocs, increment, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
         const firebaseConfig = {
@@ -1728,25 +1728,38 @@ function renderPublicLayout() {
             }
         }
 
-        async function createUserProfile(user, username) {
-            // This transaction ensures both writes succeed or fail together.
-            const batch = writeBatch(db);
+async function createUserProfile(user, username) {
+            try {
+                // Use a transaction to ensure username uniqueness
+                await runTransaction(db, async (transaction) => {
+                    const usernameRef = doc(db, `artifacts/${appId}/usernames`, username.toLowerCase());
+                    const usernameDoc = await transaction.get(usernameRef);
 
-            // 1. Write to the main user document for searching
-            const userRef = doc(db, `/artifacts/${appId}/users`, user.uid);
-            batch.set(userRef, { username: username }, { merge: true });
+                    if (usernameDoc.exists()) {
+                        throw new Error("Username is already taken."); // This will cancel the transaction
+                    }
 
-            // 2. Write to the profile subcollection for display
-            const profileRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'details');
-            batch.set(profileRef, {
-                username: username,
-                following: 0,
-                followers: 0
-            });
-            
-            await batch.commit();
+                    // Username is available, so create all necessary documents
+                    // 1. Create the username lookup document
+                    transaction.set(usernameRef, { userId: user.uid });
+                    
+                    // 2. Write to the main user document for searching
+                    const userRef = doc(db, `/artifacts/${appId}/users`, user.uid);
+                    transaction.set(userRef, { username: username }, { merge: true });
+
+                    // 3. Write to the profile subcollection for display
+                    const profileRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'details');
+                    transaction.set(profileRef, {
+                        username: username,
+                        following: 0,
+                        followers: 0
+                    });
+                });
+            } catch (error) {
+                // Re-throw the error so handleSignUp can catch it and show the user
+                throw error;
+            }
         }
-
         async function handleSignUp() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -1763,6 +1776,8 @@ function renderPublicLayout() {
                     showAuthError('An account with this email already exists.');
                 } else if (error.code === 'auth/weak-password') {
                     showAuthError('Password should be at least 6 characters.');
+                } else if (error.message === "Username is already taken.") {
+                    showAuthError('This username is already taken. Please choose another.');
                 } else {
                     showAuthError('An error occurred during sign up.');
                 }
@@ -1820,21 +1835,43 @@ function renderPublicLayout() {
         // --- DATA LOGIC ---
         
         async function updateUserProfile(newUsername) {
-            if (!userId || !newUsername) return;
+            if (!userId || !newUsername || !userProfile) return;
+            const oldUsername = userProfile.username;
+
+            if (oldUsername.toLowerCase() === newUsername.toLowerCase()) {
+                // No change needed if username is the same (case-insensitive)
+                return;
+            }
+
             try {
-                const batch = writeBatch(db);
+                await runTransaction(db, async (transaction) => {
+                    // Check if the new username is already taken
+                    const newUsernameRef = doc(db, `artifacts/${appId}/usernames`, newUsername.toLowerCase());
+                    const newUsernameDoc = await transaction.get(newUsernameRef);
 
-                // 1. Update the main user document
-                const userRef = doc(db, `/artifacts/${appId}/users`, userId);
-                batch.update(userRef, { username: newUsername });
+                    if (newUsernameDoc.exists()) {
+                        throw new Error("Username is already taken.");
+                    }
+                    
+                    // 1. Delete the old username document
+                    const oldUsernameRef = doc(db, `artifacts/${appId}/usernames`, oldUsername.toLowerCase());
+                    transaction.delete(oldUsernameRef);
+                    
+                    // 2. Create the new username document
+                    transaction.set(newUsernameRef, { userId: userId });
 
-                // 2. Update the profile subcollection
-                const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
-                batch.update(profileRef, { username: newUsername });
-                
-                await batch.commit();
+                    // 3. Update the main user document
+                    const userRef = doc(db, `/artifacts/${appId}/users`, userId);
+                    transaction.update(userRef, { username: newUsername });
+
+                    // 4. Update the profile subcollection
+                    const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
+                    transaction.update(profileRef, { username: newUsername });
+                });
+                alert('Profile updated successfully!'); // Give user feedback
             } catch (error) {
                 console.error("Error updating user profile:", error);
+                alert(`Error: ${error.message}`); // Show specific error
             }
         }
 
