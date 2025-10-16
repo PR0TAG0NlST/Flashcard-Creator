@@ -2573,7 +2573,7 @@ async function createUserProfile(user, username) {
             }
         }
         
-async function renderPublicProfileView(profileUserId) {
+        async function renderPublicProfileView(profileUserId) {
             setHeader('Public Profile');
             const content = document.getElementById('app-content');
             content.innerHTML = `<div class="text-center text-gray-500">Loading profile...</div>`;
@@ -2591,13 +2591,26 @@ async function renderPublicProfileView(profileUserId) {
 
                 // Fetch user's public decks
                 const publicDecksQuery = query(collection(db, `artifacts/${appId}/public_decks`), where("ownerId", "==", profileUserId));
-                const publicDecksSnapshot = await getDocs(publicDecksQuery);
+                
+                // --- START OF FIX ---
+                // Get live follower and following counts directly from the subcollections
+                const followersQuery = collection(db, `artifacts/${appId}/users/${profileUserId}/followers`);
+                const followingQuery = collection(db, `artifacts/${appId}/users/${profileUserId}/following`);
+                
+                // Run all fetches in parallel for efficiency
+                const [publicDecksSnapshot, followersSnapshot, followingSnapshot] = await Promise.all([
+                    getDocs(publicDecksQuery),
+                    getDocs(followersQuery),
+                    getDocs(followingQuery)
+                ]);
+
                 const publicDecks = publicDecksSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                const followers = followersSnapshot.size;
+                const following = followingSnapshot.size;
+                // --- END OF FIX ---
 
                 const username = profileData.username || 'User';
-                const followers = profileData.followers || 0;
-                const following = profileData.following || 0;
-
+                
                 // Check follow status and determine button HTML
                 const isFollowing = await checkIfFollowing(profileUserId);
                 const isOwnProfile = userId === profileUserId;
@@ -2665,6 +2678,8 @@ async function renderPublicProfileView(profileUserId) {
                         } else {
                             await followUser(profileUserId);
                         }
+                        // Re-render the view to update button state and counts
+                        renderPublicProfileView(profileUserId); 
                     });
                 }
 
@@ -2682,16 +2697,25 @@ async function renderPublicProfileView(profileUserId) {
         }
 
         // --- Profile View ---
-        function renderProfileView() {
+        async function renderProfileView() {
             setActiveNav('nav-profile');
             setHeader('Profile');
             const content = document.getElementById('app-content');
 
             const publishedDecks = allUserDecks.filter(deck => deck.isPublic);
-
             const username = userProfile?.username || 'User';
-            const followers = userProfile?.followers || 0;
-            const following = userProfile?.following || 0;
+
+            // Get live follower and following counts for the current user
+            const followersQuery = collection(db, `artifacts/${appId}/users/${userId}/followers`);
+            const followingQuery = collection(db, `artifacts/${appId}/users/${userId}/following`);
+            
+            const [followersSnapshot, followingSnapshot] = await Promise.all([
+                getDocs(followersQuery),
+                getDocs(followingQuery)
+            ]);
+
+            const followers = followersSnapshot.size;
+            const following = followingSnapshot.size;
 
             content.innerHTML = `
                 <div class="max-w-4xl mx-auto">
@@ -2711,44 +2735,18 @@ async function renderPublicProfileView(profileUserId) {
                             <div class="flex space-x-2">
                                 <button id="edit-profile-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600">Edit Profile</button>
                                 <button id="share-profile-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600">Share</button>
+                                <button id="find-friends-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Find Friends</button>
                             </div>
                         </div>
                     </div>
-
-                    <div class="mt-8">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-semibold">Published Decks</h3>
-                            <button id="find-friends-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Find Friends</button>
-                        </div>
-                        
-                        ${publishedDecks.length > 0 ? `
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                ${publishedDecks.map(deck => {
-                                    const cardCount = deck.cards ? deck.cards.length : 0;
-                                    return `
-                                    <div class="deck-card bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden cursor-pointer" data-id="${deck.id}">
-                                        <div class="p-4">
-                                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">${deck.topic}</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">${cardCount} cards</p>
-                                        </div>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                        ` : `
-                            <div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
-                                <p class="text-gray-500 dark:text-gray-400">You haven't published any decks yet.</p>
-                            </div>
-                        `}
                     </div>
-                </div>
             `;
 
+            // Re-attach all event listeners
             document.getElementById('edit-profile-btn').addEventListener('click', renderEditProfileModal);
             document.getElementById('share-profile-btn').addEventListener('click', renderShareProfileModal);
             document.getElementById('find-friends-btn').addEventListener('click', renderFindFriendsView);
-            document.querySelectorAll('.deck-card').forEach(card => card.addEventListener('click', (e) => {
-                viewDeck(card.dataset.id);
-            }));
+            // If you add your published decks list back to this view, re-add the .deck-card listeners too.
         }
 
         function viewDeck(deckId) {
@@ -2963,10 +2961,11 @@ async function renderPublicProfileView(profileUserId) {
                 document.getElementById('app-root').innerHTML = '<div class="text-center text-red-500">Failed to load the application.</div>';
             }
         }
+
 // --- Follow/Follower Logic ---
 
         async function followUser(targetUserId) {
-            if (!userId || userId === targetUserId) return; // Prevent following yourself
+            if (!userId || userId === targetUserId) return;
 
             const batch = writeBatch(db);
 
@@ -2977,19 +2976,10 @@ async function renderPublicProfileView(profileUserId) {
             // 2. Add current user to target user's 'followers' list
             const followerRef = doc(db, `artifacts/${appId}/users/${targetUserId}/followers`, userId);
             batch.set(followerRef, { timestamp: new Date() });
-            
-            // 3. Increment the following count for the current user
-            const currentUserProfileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
-            batch.update(currentUserProfileRef, { following: increment(1) });
-
-            // 4. Increment the followers count for the target user
-            const targetUserProfileRef = doc(db, `/artifacts/${appId}/users/${targetUserId}/profile`, 'details');
-            batch.update(targetUserProfileRef, { followers: increment(1) });
 
             try {
                 await batch.commit();
                 console.log("User followed successfully!");
-                renderPublicProfileView(targetUserId); // Re-render the profile
             } catch (error) {
                 console.error("Error following user: ", error);
             }
@@ -3007,19 +2997,10 @@ async function renderPublicProfileView(profileUserId) {
             // 2. Remove current user from 'followers' list
             const followerRef = doc(db, `artifacts/${appId}/users/${targetUserId}/followers`, userId);
             batch.delete(followerRef);
-            
-            // 3. Decrement the following count for the current user
-            const currentUserProfileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
-            batch.update(currentUserProfileRef, { following: increment(-1) });
-
-            // 4. Decrement the followers count for the target user
-            const targetUserProfileRef = doc(db, `/artifacts/${appId}/users/${targetUserId}/profile`, 'details');
-            batch.update(targetUserProfileRef, { followers: increment(-1) });
 
             try {
                 await batch.commit();
                 console.log("User unfollowed successfully!");
-                renderPublicProfileView(targetUserId); // Re-render the profile
             } catch (error) {
                 console.error("Error unfollowing user: ", error);
             }
