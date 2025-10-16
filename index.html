@@ -74,7 +74,7 @@
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch, getDocs, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
         const firebaseConfig = {
@@ -98,6 +98,8 @@
         let progressChartInstance = null;
         let allPublicDecks = [];
         let chatHistory = [];
+
+        startApp(firebaseConfig);
 
 
         // --- FUNCTION DECLARATIONS (ORDERED TO PREVENT REFERENCE ERRORS) ---
@@ -2507,7 +2509,7 @@ function renderPublicLayout() {
             }
         }
         
-        async function renderPublicProfileView(profileUserId) {
+async function renderPublicProfileView(profileUserId) {
             setHeader('Public Profile');
             const content = document.getElementById('app-content');
             content.innerHTML = `<div class="text-center text-gray-500">Loading profile...</div>`;
@@ -2524,16 +2526,26 @@ function renderPublicLayout() {
                 const profileData = profileSnap.data();
 
                 // Fetch user's public decks
-                const publicDecksQuery = query(
-                    collection(db, `artifacts/${appId}/public_decks`),
-                    where("ownerId", "==", profileUserId)
-                );
+                const publicDecksQuery = query(collection(db, `artifacts/${appId}/public_decks`), where("ownerId", "==", profileUserId));
                 const publicDecksSnapshot = await getDocs(publicDecksQuery);
                 const publicDecks = publicDecksSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
                 const username = profileData.username || 'User';
                 const followers = profileData.followers || 0;
                 const following = profileData.following || 0;
+
+                // Check follow status and determine button HTML
+                const isFollowing = await checkIfFollowing(profileUserId);
+                const isOwnProfile = userId === profileUserId;
+                let followButtonHTML = '';
+
+                if (userId && !isOwnProfile) { // Show button only if logged in and not your own profile
+                    if (isFollowing) {
+                        followButtonHTML = `<button id="follow-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600">Unfollow</button>`;
+                    } else {
+                        followButtonHTML = `<button id="follow-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Follow</button>`;
+                    }
+                }
 
                 content.innerHTML = `
                     <div class="max-w-4xl mx-auto">
@@ -2551,7 +2563,7 @@ function renderPublicLayout() {
                                     </div>
                                 </div>
                                 <div class="flex space-x-2">
-                                     <button id="follow-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Follow</button>
+                                     ${followButtonHTML}
                                 </div>
                             </div>
                         </div>
@@ -2580,8 +2592,19 @@ function renderPublicLayout() {
                     </div>
                 `;
 
-                document.getElementById('follow-btn').addEventListener('click', () => renderPlaceholderModal('follow other users'));
+                // Add the single, correct event listener
+                if (userId && !isOwnProfile) {
+                    document.getElementById('follow-btn')?.addEventListener('click', async (e) => {
+                        e.currentTarget.disabled = true; // Prevent double-clicks
+                        if (await checkIfFollowing(profileUserId)) {
+                            await unfollowUser(profileUserId);
+                        } else {
+                            await followUser(profileUserId);
+                        }
+                    });
+                }
 
+                // Add event listeners for public deck cards
                 document.querySelectorAll('.public-deck-card').forEach(card => {
                     card.addEventListener('click', (e) => {
                         renderPublicDeckDetailView(card.dataset.id);
@@ -2590,10 +2613,9 @@ function renderPublicLayout() {
 
             } catch (error) {
                 console.error("Error rendering public profile:", error);
-                content.innerHTML = `<div class="text-center text-red-500">Could not load profile.</div>`;
+                content.innerHTML = `<div class="text-center text-red-500">Could not load profile. Error: ${error.message}</div>`;
             }
         }
-
 
         // --- Profile View ---
         function renderProfileView() {
@@ -2877,9 +2899,74 @@ function renderPublicLayout() {
                 document.getElementById('app-root').innerHTML = '<div class="text-center text-red-500">Failed to load the application.</div>';
             }
         }
+// --- Follow/Follower Logic ---
 
-        startApp(firebaseConfig);
+        async function followUser(targetUserId) {
+            if (!userId || userId === targetUserId) return; // Prevent following yourself
 
+            const batch = writeBatch(db);
+
+            // 1. Add target user to current user's 'following' list
+            const followingRef = doc(db, `artifacts/${appId}/users/${userId}/following`, targetUserId);
+            batch.set(followingRef, { timestamp: new Date() });
+
+            // 2. Add current user to target user's 'followers' list
+            const followerRef = doc(db, `artifacts/${appId}/users/${targetUserId}/followers`, userId);
+            batch.set(followerRef, { timestamp: new Date() });
+            
+            // 3. Increment the following count for the current user
+            const currentUserProfileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
+            batch.update(currentUserProfileRef, { following: increment(1) });
+
+            // 4. Increment the followers count for the target user
+            const targetUserProfileRef = doc(db, `/artifacts/${appId}/users/${targetUserId}/profile`, 'details');
+            batch.update(targetUserProfileRef, { followers: increment(1) });
+
+            try {
+                await batch.commit();
+                console.log("User followed successfully!");
+                renderPublicProfileView(targetUserId); // Re-render the profile
+            } catch (error) {
+                console.error("Error following user: ", error);
+            }
+        }
+
+        async function unfollowUser(targetUserId) {
+            if (!userId || userId === targetUserId) return;
+
+            const batch = writeBatch(db);
+
+            // 1. Remove target user from 'following' list
+            const followingRef = doc(db, `artifacts/${appId}/users/${userId}/following`, targetUserId);
+            batch.delete(followingRef);
+
+            // 2. Remove current user from 'followers' list
+            const followerRef = doc(db, `artifacts/${appId}/users/${targetUserId}/followers`, userId);
+            batch.delete(followerRef);
+            
+            // 3. Decrement the following count for the current user
+            const currentUserProfileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
+            batch.update(currentUserProfileRef, { following: increment(-1) });
+
+            // 4. Decrement the followers count for the target user
+            const targetUserProfileRef = doc(db, `/artifacts/${appId}/users/${targetUserId}/profile`, 'details');
+            batch.update(targetUserProfileRef, { followers: increment(-1) });
+
+            try {
+                await batch.commit();
+                console.log("User unfollowed successfully!");
+                renderPublicProfileView(targetUserId); // Re-render the profile
+            } catch (error) {
+                console.error("Error unfollowing user: ", error);
+            }
+        }
+
+        async function checkIfFollowing(targetUserId) {
+            if (!userId) return false;
+            const followingRef = doc(db, `artifacts/${appId}/users/${userId}/following`, targetUserId);
+            const docSnap = await getDoc(followingRef);
+            return docSnap.exists();
+        }
     </script>
 </body>
 </html>
