@@ -1158,19 +1158,12 @@
 
                 document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
                 document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
-                document.getElementById('start-quiz-btn').addEventListener('click', () => renderQuizModal(deck));
                 
-                document.querySelectorAll('.edit-card-btn').forEach(btn => {
-                    const cardIndex = parseInt(btn.dataset.index);
-                    const cardToEdit = cards[cardIndex];
-                    btn.addEventListener('click', () => {
-                        renderEditCardModal(deckId, cardIndex, cardToEdit);
-                    });
-                });
-
-                document.querySelectorAll('.delete-card-btn').forEach(btn => btn.addEventListener('click', () => {
-                    deleteCard(deckId, parseInt(btn.dataset.index));
-                }));
+                // --- THIS LINE IS THE FIX ---
+                document.getElementById('start-quiz-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
+                
+                document.querySelectorAll('.edit-card-btn').forEach(btn => { /* ... */ });
+                document.querySelectorAll('.delete-card-btn').forEach(btn => { /* ... */ });
             } catch (error) {
                 console.error("Error fetching single deck:", error);
             }
@@ -1799,6 +1792,38 @@ async function generateQuizWithAI(deck) {
 
             document.getElementById('quiz-again-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
             document.getElementById('quiz-decks-btn').addEventListener('click', () => renderDecksView(allUserDecks));
+        }
+
+        function renderQuizSelectionModal(decks) {
+            const modalContent = `
+                <div id="quiz-deck-selection" class="space-y-2 max-h-96 overflow-y-auto">
+                    ${decks.map(deck => `
+                        <button class="w-full text-left p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" data-deck-id="${deck.id}">
+                            ${deck.topic}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            renderModal('quiz-selection-modal', 'Select a Deck to Quiz', modalContent, () => {}, '');
+            const selectionModal = document.getElementById('quiz-selection-modal');
+            selectionModal.querySelector('#modal-save-btn').style.display = 'none'; // Hide footer buttons
+            selectionModal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
+
+            document.getElementById('quiz-deck-selection').addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (button && button.dataset.deckId) {
+                    const deckId = button.dataset.deckId;
+                    const selectedDeck = decks.find(d => d.id === deckId);
+                    if (selectedDeck) {
+                        selectionModal.remove();
+                        if (selectedDeck.cards && selectedDeck.cards.length > 0) {
+                            startAIGeneratedQuiz(selectedDeck); // This starts the new AI quiz
+                        } else {
+                            alert('This deck has no cards to generate a quiz from!');
+                        }
+                    }
+                }
+            });
         }
         
         function renderChatbotModal(cardData) {
