@@ -1617,10 +1617,11 @@ async function generateQuizWithAI(deck) {
             const content = document.getElementById('app-content');
             let currentQuestionIndex = 0;
             let score = 0;
+            let userAnswers = []; // Array to track all answers and skips
 
             function displayQuestion() {
                 if (currentQuestionIndex >= quizQuestions.length) {
-                    renderQuizResultsView(score, quizQuestions.length, deck);
+                    renderQuizResultsView(score, quizQuestions.length, deck, userAnswers);
                     return;
                 }
 
@@ -1640,25 +1641,33 @@ async function generateQuizWithAI(deck) {
                                     </button>
                                 `).join('')}
                             </div>
-                            <div id="quiz-feedback" class="mt-6 text-center"></div>
+                            <div id="quiz-feedback" class="mt-6 flex justify-center items-center">
+                                <button id="skip-question-btn" class="px-6 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Skip</button>
+                            </div>
                         </div>
                     </div>
                 `;
 
+                // Handle selecting an answer
                 document.querySelectorAll('.quiz-option').forEach(button => {
                     button.addEventListener('click', (e) => {
                         const selectedAnswer = e.currentTarget.textContent.trim();
                         const isCorrect = selectedAnswer === q.correctAnswer;
                         
-                        // Disable all buttons after an answer is chosen
-                        document.querySelectorAll('.quiz-option').forEach(btn => btn.disabled = true);
+                        userAnswers.push({
+                            question: q.question,
+                            options: q.options,
+                            correctAnswer: q.correctAnswer,
+                            userAnswer: selectedAnswer,
+                            status: isCorrect ? 'correct' : 'incorrect'
+                        });
 
+                        document.querySelectorAll('.quiz-option').forEach(btn => btn.disabled = true);
                         if (isCorrect) {
                             score++;
                             e.currentTarget.classList.add('bg-green-500', 'text-white');
                         } else {
                             e.currentTarget.classList.add('bg-red-500', 'text-white');
-                            // Highlight the correct answer
                             document.querySelectorAll('.quiz-option').forEach(btn => {
                                 if (btn.textContent.trim() === q.correctAnswer) {
                                     btn.classList.add('bg-green-500', 'text-white');
@@ -1666,9 +1675,8 @@ async function generateQuizWithAI(deck) {
                             });
                         }
                         
-                        // Show next button
                         document.getElementById('quiz-feedback').innerHTML = `
-                            <button id="next-question-btn" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg">Next</button>
+                            <button id="next-question-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Next</button>
                         `;
                         document.getElementById('next-question-btn').addEventListener('click', () => {
                             currentQuestionIndex++;
@@ -1676,63 +1684,121 @@ async function generateQuizWithAI(deck) {
                         });
                     });
                 });
+
+                // Handle skipping a question
+                document.getElementById('skip-question-btn').addEventListener('click', () => {
+                    userAnswers.push({
+                        question: q.question,
+                        options: q.options,
+                        correctAnswer: q.correctAnswer,
+                        userAnswer: null,
+                        status: 'skipped'
+                    });
+                    currentQuestionIndex++;
+                    displayQuestion();
+                });
             }
 
             displayQuestion();
         }
 
-        function renderQuizResultsView(score, totalQuestions, deck) {
+        function renderQuizResultsView(score, totalQuestions, deck, userAnswers) {
             setHeader(`Quiz Results: ${deck.topic}`);
             const content = document.getElementById('app-content');
-            const percentage = Math.round((score / totalQuestions) * 100);
+            const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+            const correctCount = userAnswers.filter(a => a.status === 'correct').length;
+            const incorrectCount = userAnswers.filter(a => a.status === 'incorrect').length;
+            const skippedCount = userAnswers.filter(a => a.status === 'skipped').length;
+
+            // Determine the color for the score circle
+            let scoreColorClass = 'text-red-500 border-red-500';
+            if (percentage >= 75) {
+                scoreColorClass = 'text-green-500 border-green-500';
+            } else if (percentage >= 50) {
+                scoreColorClass = 'text-yellow-500 border-yellow-500';
+            }
+
+            // Generate the detailed question review
+            const reviewHTML = userAnswers.map((answer, index) => {
+                const questionNumber = index + 1;
+                let statusIcon = '';
+                if (answer.status === 'correct') {
+                    statusIcon = `<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+                } else if (answer.status === 'incorrect') {
+                    statusIcon = `<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>`;
+                } else { // Skipped
+                    statusIcon = `<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>`;
+                }
+
+                return `
+                    <div class="py-4 border-b dark:border-gray-700">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 mr-3">${statusIcon}</div>
+                            <div class="flex-1">
+                                <p class="mb-4">${questionNumber}. ${answer.question}</p>
+                                <div class="space-y-2">
+                                    ${answer.options.map(option => {
+                                        let optionClass = 'border-gray-300 dark:border-gray-600';
+                                        if (option === answer.correctAnswer) {
+                                            optionClass = 'border-green-500 bg-green-50 dark:bg-green-900/50 text-green-800 dark:text-green-300 font-bold';
+                                        }
+                                        if (answer.status === 'incorrect' && option === answer.userAnswer) {
+                                            optionClass = 'border-red-500 bg-red-50 dark:bg-red-900/50 text-red-800 dark:text-red-300';
+                                        }
+                                        return `<div class="p-3 border rounded-md ${optionClass}">${option}</div>`;
+                                    }).join('')}
+                                </div>
+                                ${answer.status === 'skipped' ? '<p class="text-sm text-yellow-500 mt-2">You skipped this question.</p>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
 
             content.innerHTML = `
-                <div class="max-w-md mx-auto text-center bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
-                    <h2 class="text-3xl font-bold mb-2">Quiz Complete!</h2>
-                    <p class="text-lg text-gray-600 dark:text-gray-400 mb-6">You scored</p>
-                    <p class="text-6xl font-extrabold text-blue-600 mb-2">${score} / ${totalQuestions}</p>
-                    <p class="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-8">(${percentage}%)</p>
-                    <div class="flex justify-center space-x-4">
-                        <button id="quiz-again-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Try Again</button>
-                        <button id="quiz-decks-btn" class="px-6 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Back to Decks</button>
+                <div class="max-w-4xl mx-auto">
+                    <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-bold mb-4">Don't give up now! Trust the process.</h2>
+                        <div class="flex justify-center items-center space-x-12">
+                            <div class="flex flex-col items-center">
+                                <div class="w-32 h-32 flex items-center justify-center border-4 ${scoreColorClass} rounded-full mb-2">
+                                    <span class="text-4xl font-bold ${scoreColorClass}">${percentage}%</span>
+                                </div>
+                                <span class="font-semibold text-lg">Score</span>
+                            </div>
+                            <div class="text-left space-y-4">
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                    <span><strong class="text-gray-900 dark:text-white">${correctCount}</strong> Correct</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+                                    <span><strong class="text-gray-900 dark:text-white">${incorrectCount}</strong> Incorrect</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                                    <span><strong class="text-gray-900 dark:text-white">${skippedCount}</strong> Skipped</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h3 class="text-xl font-bold mb-4">Review your answers</h3>
+                        <div id="quiz-review-list">
+                            ${reviewHTML}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 flex justify-center space-x-4">
+                        <button id="quiz-again-btn" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Try Again</button>
+                        <button id="quiz-decks-btn" class="px-8 py-3 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 font-semibold">Back to Decks</button>
                     </div>
                 </div>
             `;
 
             document.getElementById('quiz-again-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
             document.getElementById('quiz-decks-btn').addEventListener('click', () => renderDecksView(allUserDecks));
-        }
-        
-        function renderQuizSelectionModal(decks) {
-            const modalContent = `
-                <div id="quiz-deck-selection" class="space-y-2">
-                    ${decks.map(deck => `
-                        <button class="w-full text-left p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" data-deck-id="${deck.id}">
-                            ${deck.topic}
-                        </button>
-                    `).join('')}
-                </div>
-            `;
-            renderModal('quiz-selection-modal', 'Select a Deck to Quiz', modalContent, () => {}, '');
-            const selectionModal = document.getElementById('quiz-selection-modal');
-            selectionModal.querySelector('#modal-save-btn').style.display = 'none'; // Hide footer buttons
-            selectionModal.querySelector('.modal-close-btn').style.display = 'none';
-
-            document.getElementById('quiz-deck-selection').addEventListener('click', (e) => {
-                const button = e.target.closest('button');
-                if (button && button.dataset.deckId) {
-                    const deckId = button.dataset.deckId;
-                    const selectedDeck = decks.find(d => d.id === deckId);
-                    if (selectedDeck) {
-                        selectionModal.remove();
-                        if (selectedDeck.cards && selectedDeck.cards.length > 0) {
-                            startAIGeneratedQuiz(selectedDeck); // THIS LINE IS THE KEY CHANGE
-                        } else {
-                            alert('This deck has no cards to generate a quiz from!');
-                        }
-                    }
-                }
-            });
         }
         
         function renderChatbotModal(cardData) {
