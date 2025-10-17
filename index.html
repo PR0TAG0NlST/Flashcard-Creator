@@ -70,10 +70,17 @@
     </div>
 
     <!-- Firebase and App Logic -->
+
     <script type="module">
+
         // Import Firebase modules
+
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
         import { getFirestore, collection, doc, addDoc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, updateDoc, writeBatch, getDocs, increment, runTransaction, documentId } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
@@ -92,7 +99,7 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         // Global variables
-        let app, db, auth, userId, userProfile;
+        let app, db, auth, storage, userId, userProfile;
         let allUserDecks = [];
         let progressSubjects = [];
         let progressChartInstance = null;
@@ -132,18 +139,60 @@
 
         function renderEditProfileModal() {
             const currentUsername = userProfile?.username || '';
-            renderModal('edit-profile-modal', 'Edit Profile', `
-                <form id="edit-profile-form">
-                    <label for="username-edit" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
-                    <input type="text" id="username-edit" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" value="${currentUsername}">
-                </form>
-            `, () => {
+            const currentPhotoURL = userProfile?.photoURL;
+
+            const modalContent = `
+                <div class="flex flex-col items-center">
+                    <div class="relative mb-4">
+                        <img id="pfp-preview" class="w-24 h-24 rounded-full object-cover bg-gray-200 dark:bg-gray-700" src="${currentPhotoURL || ''}" alt="Profile Preview">
+                        <label for="pfp-upload" class="absolute -bottom-1 -right-1 bg-blue-600 rounded-full p-1 cursor-pointer hover:bg-blue-700">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                        </label>
+                        <input type="file" id="pfp-upload" class="hidden" accept="image/*">
+                    </div>
+                    <form id="edit-profile-form" class="w-full">
+                        <label for="username-edit" class="block text-sm font-medium">Username</label>
+                        <input type="text" id="username-edit" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md" value="${currentUsername}">
+                    </form>
+                </div>
+            `;
+            
+            renderModal('edit-profile-modal', 'Edit Profile', modalContent, async () => {
+                const saveButton = document.getElementById('modal-save-btn');
+                saveButton.disabled = true;
+                saveButton.textContent = 'Saving...';
+
                 const newUsername = document.getElementById('username-edit').value.trim();
-                if (newUsername) {
-                    updateUserProfile(newUsername);
+                const fileInput = document.getElementById('pfp-upload');
+                const file = fileInput.files[0];
+
+                try {
+                    const updatePromises = [];
+                    if (file) {
+                        updatePromises.push(uploadProfilePicture(file));
+                    }
+                    if (newUsername && newUsername !== currentUsername) {
+                        updatePromises.push(updateUserProfile(newUsername));
+                    }
+                    await Promise.all(updatePromises);
+                } catch (error) {
+                    console.error("Error saving profile:", error);
+                    alert("Failed to save profile. Check the console for details.");
+                } finally {
                     document.getElementById('edit-profile-modal')?.remove();
                 }
             }, 'Save Changes');
+
+            const pfpUpload = document.getElementById('pfp-upload');
+            const pfpPreview = document.getElementById('pfp-preview');
+            pfpUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => pfpPreview.src = event.target.result;
+                    reader.readAsDataURL(file);
+                }
+            });
         }
 
         function renderShareProfileModal() {
@@ -2562,7 +2611,7 @@ async function createUserProfile(user, username) {
                 }
                 const profileData = profileSnap.data();
 
-                // Fetch public decks, follower count, and following count in parallel for speed
+                // Fetch public decks, follower count, and following count in parallel
                 const publicDecksQuery = query(collection(db, `artifacts/${appId}/public_decks`), where("ownerId", "==", profileUserId));
                 const followersQuery = collection(db, `artifacts/${appId}/users/${profileUserId}/followers`);
                 const followingQuery = collection(db, `artifacts/${appId}/users/${profileUserId}/following`);
@@ -2601,8 +2650,11 @@ async function createUserProfile(user, username) {
                     <div class="max-w-4xl mx-auto">
                         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                             <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
-                                <div class="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                                    <span class="text-3xl text-gray-500">${username.charAt(0).toUpperCase()}</span>
+                                <div class="w-24 h-24 rounded-full">
+                                    ${(profileData?.photoURL) ?
+                                        `<img src="${profileData.photoURL}" alt="Profile Picture" class="w-full h-full rounded-full object-cover">` :
+                                        `<div class="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center"><span class="text-3xl text-gray-500">${username.charAt(0).toUpperCase()}</span></div>`
+                                    }
                                 </div>
                                 <div class="flex-1 text-center md:text-left">
                                     <h2 class="text-2xl font-bold">${username}</h2>
@@ -2633,7 +2685,7 @@ async function createUserProfile(user, username) {
                     </div>
                 `;
 
-                // Attach the event listener for the main follow/unfollow/cancel button
+                // Attach event listener for the main follow/unfollow/cancel button
                 if (userId && !isOwnProfile) {
                     document.getElementById('follow-btn')?.addEventListener('click', async (e) => {
                         e.currentTarget.disabled = true;
@@ -2643,7 +2695,7 @@ async function createUserProfile(user, username) {
                             case 'REQUEST_SENT': await cancelFollowRequest(profileUserId); break;
                             default: await sendFollowRequest(profileUserId);
                         }
-                        renderPublicProfileView(profileUserId); // Re-render the page to update the button
+                        renderPublicProfileView(profileUserId);
                     });
                 }
 
@@ -2671,6 +2723,7 @@ async function createUserProfile(user, username) {
             const publishedDecks = allUserDecks.filter(deck => deck.isPublic);
             const username = userProfile?.username || 'User';
 
+            // Get live follower and following counts for the current user
             const followersQuery = collection(db, `artifacts/${appId}/users/${userId}/followers`);
             const followingQuery = collection(db, `artifacts/${appId}/users/${userId}/following`);
             
@@ -2686,8 +2739,11 @@ async function createUserProfile(user, username) {
                 <div class="max-w-4xl mx-auto">
                     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                         <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
-                            <div class="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                                <span class="text-3xl text-gray-500">${username.charAt(0).toUpperCase()}</span>
+                            <div class="w-24 h-24 rounded-full">
+                                ${(userProfile?.photoURL) ?
+                                    `<img src="${userProfile.photoURL}" alt="Profile Picture" class="w-full h-full rounded-full object-cover">` :
+                                    `<div class="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center"><span class="text-3xl text-gray-500">${username.charAt(0).toUpperCase()}</span></div>`
+                                }
                             </div>
                             <div class="flex-1 text-center md:text-left">
                                 <h2 class="text-2xl font-bold">${username}</h2>
@@ -2711,7 +2767,6 @@ async function createUserProfile(user, username) {
             document.getElementById('share-profile-btn').addEventListener('click', renderShareProfileModal);
             document.getElementById('find-friends-btn').addEventListener('click', renderFindFriendsView);
             
-            // ADD these two new listeners
             document.getElementById('followers-link').addEventListener('click', () => renderFollowListModal('Followers', userId));
             document.getElementById('following-link').addEventListener('click', () => renderFollowListModal('Following', userId));
         }
@@ -2857,46 +2912,41 @@ async function createUserProfile(user, username) {
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-
-                const urlParams = new URLSearchParams(window.location.search);
-                const profileId = urlParams.get('profile');
-
-                // Initialize theme
+                storage = getStorage(app); // Make sure storage is initialized
                 initializeAndApplyTheme();
 
-                // Set up authentication state listener
                 onAuthStateChanged(auth, (user) => {
+                    // --- FIX: Moved URL parsing inside the listener ---
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const profileId = urlParams.get('profile');
+
                     if (user) {
-                        // User is signed in
                         userId = user.uid;
                         fetchUserProfile();
                         fetchAndDisplayDecks();
                         fetchProgressSubjects();
                         listenForFollowRequests();
                         renderAppLayout();
-                        // setupEventListeners(); // This is called inside renderAppLayout now
 
-                        // If a profile ID is in the URL and it's not the current user, show public profile
                         if (profileId && profileId !== userId) {
+                            // If a profile ID is in the URL, show that profile
                             renderPublicProfileView(profileId);
                         } else {
-                            // Default to rendering the user's decks
+                            // Otherwise, default to the user's decks
                             renderDecksView(allUserDecks);
                         }
                     } else {
-                        // No user is signed in
                         if (profileId) {
-                            // If a profile ID is in the URL, show public profile
+                            // If not logged in but a profile ID exists, show public profile
                             renderPublicLayout();
                             renderPublicProfileView(profileId);
                         } else {
-                            // Otherwise, show login view
+                            // Otherwise, show the login page
                             renderLoginView();
                         }
                     }
-                }); // The extra brace before this line has been removed.
+                });
 
-                // Add modals container if not present
                 if (!document.getElementById('modals-container')) {
                     const modalsDiv = document.createElement('div');
                     modalsDiv.id = 'modals-container';
@@ -2905,7 +2955,7 @@ async function createUserProfile(user, username) {
 
             } catch (error) {
                 console.error("Error initializing app:", error);
-                document.getElementById('app-root').innerHTML = '<div class="text-center text-red-500">Failed to load the application.</div>';
+                document.getElementById('app-root').innerHTML = '<div class="text-center text-red-500">Failed to load application.</div>';
             }
         }
 
@@ -3012,6 +3062,28 @@ async function createUserProfile(user, username) {
             } catch (error) { // ADDED BRACES HERE
                 console.error("Error unfollowing user: ", error);
             } // AND HERE
+        }
+
+        async function removeFollower(followerId) {
+            if (!userId || userId === followerId) return;
+
+            // This performs the reverse action of unfollowing
+            const batch = writeBatch(db);
+
+            // 1. Remove the user from your 'followers' list
+            const followerRef = doc(db, `artifacts/${appId}/users/${userId}/followers`, followerId);
+            batch.delete(followerRef);
+
+            // 2. Remove yourself from their 'following' list
+            const followingRef = doc(db, `artifacts/${appId}/users/${followerId}/following`, userId);
+            batch.delete(followingRef);
+
+            try {
+                await batch.commit();
+                console.log("Follower removed successfully!");
+            } catch (error) {
+                console.error("Error removing follower:", error);
+            }
         }
 
         async function searchUsers(searchTerm) {
@@ -3218,17 +3290,16 @@ async function createUserProfile(user, username) {
         }
 
         async function renderFollowListModal(listType, targetUserId) {
-            const listName = listType.toLowerCase(); // 'followers' or 'following'
-            const modalTitle = `Users ${listName === 'followers' ? 'Following' : 'Followed by'} ${targetUserId === userId ? 'You' : 'this User'}`;
+            const listName = listType.toLowerCase();
+            const isMyProfile = targetUserId === userId;
+            const modalTitle = isMyProfile ? `Your ${listType}` : `Users ${listName === 'followers' ? 'Following' : 'Followed by'} this User`;
             
-            // Show a loading state immediately
             renderModal('follow-list-modal', modalTitle, `<div class="text-center text-gray-500">Loading...</div>`, () => {}, '');
             const modal = document.getElementById('follow-list-modal');
             modal.querySelector('#modal-save-btn').style.display = 'none';
             modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
 
             try {
-                // 1. Get the list of user IDs
                 const listQuery = collection(db, `artifacts/${appId}/users/${targetUserId}/${listName}`);
                 const listSnapshot = await getDocs(listQuery);
                 const userIds = listSnapshot.docs.map(doc => doc.id);
@@ -3237,38 +3308,99 @@ async function createUserProfile(user, username) {
                 if (userIds.length === 0) {
                     modalContentHTML = `<p class="text-center text-gray-500">No users found in this list.</p>`;
                 } else {
-                    // 2. Fetch the profile data for each user ID
                     const userDocs = await Promise.all(userIds.map(id => getDoc(doc(db, `artifacts/${appId}/users`, id))));
                     const users = userDocs.map(docSnap => ({
                         id: docSnap.id,
-                        username: docSnap.exists() ? docSnap.data().username : 'Unknown User'
+                        username: docSnap.exists() ? docSnap.data().username : 'Unknown User',
+                        photoURL: docSnap.exists() ? docSnap.data().photoURL : null
                     }));
 
                     modalContentHTML = `
                         <ul class="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto">
-                            ${users.map(user => `
+                            ${users.map(user => {
+                                let actionButtonHTML = '';
+                                if (isMyProfile) {
+                                    if (listType === 'Following') {
+                                        actionButtonHTML = `<button class="unfollow-btn px-3 py-1 text-sm rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-red-500 hover:text-white" data-user-id="${user.id}">Unfollow</button>`;
+                                    } else { // Followers list
+                                        actionButtonHTML = `<button class="remove-follower-btn px-3 py-1 text-sm rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-red-500 hover:text-white" data-user-id="${user.id}">Remove</button>`;
+                                    }
+                                }
+                                const userAvatar = user.photoURL 
+                                    ? `<img src="${user.photoURL}" class="w-8 h-8 rounded-full object-cover mr-3">`
+                                    : `<div class="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mr-3"><span class="text-sm">${user.username.charAt(0).toUpperCase()}</span></div>`;
+
+                                return `
                                 <li class="p-3 flex items-center justify-between">
-                                    <span class="font-medium">${user.username}</span>
-                                    <a href="${window.location.pathname}?profile=${user.id}" class="view-profile-link text-sm text-blue-500 hover:underline">View Profile</a>
-                                </li>
-                            `).join('')}
+                                    <a href="#" class="view-profile-link flex items-center hover:underline" data-user-id="${user.id}">
+                                        ${userAvatar}
+                                        <span class="font-medium">${user.username}</span>
+                                    </a>
+                                    ${actionButtonHTML}
+                                </li>`;
+                            }).join('')}
                         </ul>
                     `;
                 }
                 
-                // 3. Update the modal with the final list
+                // --- FIX: Replaced reload with client-side navigation ---
                 modal.querySelector('.p-6').innerHTML = modalContentHTML;
-                modal.querySelectorAll('.view-profile-link').forEach(link => {
-                    link.addEventListener('click', (e) => {
+                modal.querySelector('.p-6').addEventListener('click', async (e) => {
+                    const profileLink = e.target.closest('.view-profile-link');
+                    const unfollowBtn = e.target.closest('.unfollow-btn');
+                    const removeBtn = e.target.closest('.remove-follower-btn');
+
+                    if (profileLink) {
                         e.preventDefault();
-                        window.location.href = e.currentTarget.href;
-                        window.location.reload(); // Reload to view the new profile
-                    });
+                        const newProfileId = profileLink.dataset.userId;
+                        // Update URL without reloading
+                        history.pushState({}, '', `${window.location.pathname}?profile=${newProfileId}`);
+                        modal.remove(); // Close the modal
+                        renderPublicProfileView(newProfileId); // Navigate to the profile instantly
+                    } else if (unfollowBtn) {
+                        unfollowBtn.disabled = true;
+                        await unfollowUser(unfollowBtn.dataset.userId);
+                        renderFollowListModal(listType, targetUserId); // Refresh the modal
+                    } else if (removeBtn) {
+                        removeBtn.disabled = true;
+                        await removeFollower(removeBtn.dataset.userId);
+                        renderFollowListModal(listType, targetUserId); // Refresh the modal
+                    }
                 });
 
             } catch (error) {
                 console.error(`Error fetching ${listType} list:`, error);
                 modal.querySelector('.p-6').innerHTML = `<p class="text-center text-red-500">Could not load list.</p>`;
+            }
+        }
+
+        async function uploadProfilePicture(file) {
+            if (!userId || !file) return;
+            
+            try {
+                // 1. Upload file to Firebase Storage in a folder named 'profile-pictures'
+                const storageRef = ref(storage, `profile-pictures/${userId}`);
+                const uploadResult = await uploadBytes(storageRef, file);
+                
+                // 2. Get the public download URL of the uploaded file
+                const downloadURL = await getDownloadURL(uploadResult.ref);
+                
+                // 3. Update Firestore with the new photoURL in a single batch
+                const batch = writeBatch(db);
+                // Update the main user doc (for search/lists)
+                const userRef = doc(db, `/artifacts/${appId}/users`, userId);
+                batch.set(userRef, { photoURL: downloadURL }, { merge: true });
+
+                // Update the profile subcollection doc (for profile pages)
+                const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
+                batch.update(profileRef, { photoURL: downloadURL });
+
+                await batch.commit();
+                console.log("Profile picture updated!");
+
+            } catch (error) {
+                console.error("Error uploading profile picture:", error);
+                throw error; // Re-throw to be caught by the modal save logic
             }
         }
     </script>
