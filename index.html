@@ -3289,8 +3289,8 @@ async function createUserProfile(user, username) {
             });
         }
 
-        async function renderFollowListModal(listType, targetUserId) {
-            const listName = listType.toLowerCase();
+       async function renderFollowListModal(listType, targetUserId) {
+            const listName = listType.toLowerCase(); // 'followers' or 'following'
             const isMyProfile = targetUserId === userId;
             const modalTitle = isMyProfile ? `Your ${listType}` : `Users ${listName === 'followers' ? 'Following' : 'Followed by'} this User`;
             
@@ -3300,6 +3300,7 @@ async function createUserProfile(user, username) {
             modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
 
             try {
+                // 1. Get the list of user IDs (this part is correct)
                 const listQuery = collection(db, `artifacts/${appId}/users/${targetUserId}/${listName}`);
                 const listSnapshot = await getDocs(listQuery);
                 const userIds = listSnapshot.docs.map(doc => doc.id);
@@ -3308,12 +3309,19 @@ async function createUserProfile(user, username) {
                 if (userIds.length === 0) {
                     modalContentHTML = `<p class="text-center text-gray-500">No users found in this list.</p>`;
                 } else {
-                    const userDocs = await Promise.all(userIds.map(id => getDoc(doc(db, `artifacts/${appId}/users`, id))));
-                    const users = userDocs.map(docSnap => ({
-                        id: docSnap.id,
+                    // --- START OF FIX ---
+                    // 2. Fetch the profile data for each user ID from the reliable subcollection
+                    const userProfilePromises = userIds.map(id => 
+                        getDoc(doc(db, `artifacts/${appId}/users/${id}/profile`, 'details'))
+                    );
+                    const userDocs = await Promise.all(userProfilePromises);
+                    
+                    const users = userDocs.map((docSnap, index) => ({
+                        id: userIds[index], // Use the ID from our original list
                         username: docSnap.exists() ? docSnap.data().username : 'Unknown User',
                         photoURL: docSnap.exists() ? docSnap.data().photoURL : null
                     }));
+                    // --- END OF FIX ---
 
                     modalContentHTML = `
                         <ul class="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto">
@@ -3343,7 +3351,7 @@ async function createUserProfile(user, username) {
                     `;
                 }
                 
-                // --- FIX: Replaced reload with client-side navigation ---
+                // 3. Update the modal with the final list and attach listeners
                 modal.querySelector('.p-6').innerHTML = modalContentHTML;
                 modal.querySelector('.p-6').addEventListener('click', async (e) => {
                     const profileLink = e.target.closest('.view-profile-link');
@@ -3353,18 +3361,17 @@ async function createUserProfile(user, username) {
                     if (profileLink) {
                         e.preventDefault();
                         const newProfileId = profileLink.dataset.userId;
-                        // Update URL without reloading
                         history.pushState({}, '', `${window.location.pathname}?profile=${newProfileId}`);
-                        modal.remove(); // Close the modal
-                        renderPublicProfileView(newProfileId); // Navigate to the profile instantly
+                        modal.remove();
+                        renderPublicProfileView(newProfileId);
                     } else if (unfollowBtn) {
                         unfollowBtn.disabled = true;
                         await unfollowUser(unfollowBtn.dataset.userId);
-                        renderFollowListModal(listType, targetUserId); // Refresh the modal
+                        renderFollowListModal(listType, targetUserId);
                     } else if (removeBtn) {
                         removeBtn.disabled = true;
                         await removeFollower(removeBtn.dataset.userId);
-                        renderFollowListModal(listType, targetUserId); // Refresh the modal
+                        renderFollowListModal(listType, targetUserId);
                     }
                 });
 
