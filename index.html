@@ -3377,30 +3377,41 @@ async function createUserProfile(user, username) {
         async function uploadProfilePicture(file) {
             if (!userId || !file) return;
             
+            // --- YOUR CLOUDINARY DETAILS ---
+            const CLOUDINARY_CLOUD_NAME = "dcs6zkrbt";
+            const CLOUDINARY_UPLOAD_PRESET = "x7qney56";
+            // --------------------------------
+
+            const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
             try {
-                // 1. Upload file to Firebase Storage in a folder named 'profile-pictures'
-                const storageRef = ref(storage, `profile-pictures/${userId}`);
-                const uploadResult = await uploadBytes(storageRef, file);
+                // 1. Upload the file to Cloudinary
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!response.ok) throw new Error('Cloudinary upload failed.');
                 
-                // 2. Get the public download URL of the uploaded file
-                const downloadURL = await getDownloadURL(uploadResult.ref);
+                const data = await response.json();
+                const downloadURL = data.secure_url; // The public URL of the image
                 
-                // 3. Update Firestore with the new photoURL in a single batch
+                // 2. Update Firestore with the new Cloudinary URL
                 const batch = writeBatch(db);
-                // Update the main user doc (for search/lists)
                 const userRef = doc(db, `/artifacts/${appId}/users`, userId);
                 batch.set(userRef, { photoURL: downloadURL }, { merge: true });
 
-                // Update the profile subcollection doc (for profile pages)
                 const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
                 batch.update(profileRef, { photoURL: downloadURL });
 
                 await batch.commit();
-                console.log("Profile picture updated!");
+                console.log("Profile picture updated using Cloudinary!");
 
             } catch (error) {
-                console.error("Error uploading profile picture:", error);
-                throw error; // Re-throw to be caught by the modal save logic
+                console.error("Error uploading to Cloudinary:", error);
+                throw error;
             }
         }
     </script>
