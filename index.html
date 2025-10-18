@@ -907,15 +907,15 @@
                         </div>
                         <nav id="main-nav" class="flex flex-col space-y-1 flex-shrink-0">
                             <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
                                 My Decks
                             </a>
                             <a href="#" id="nav-progress" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                                 Progress
                             </a>
                             <a href="#" id="nav-public-decks" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                                 Public Decks
                             </a>
                              <a href="#" id="nav-profile" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
@@ -1124,278 +1124,74 @@
             }));
         }
         
-// --- Gemini Explanation Generation ---
-async function generateExplanation(question, answer) {
-    const prompt = `Explain this flashcard in simple terms for a student: Question: ${question} Answer: ${answer}`;
+        async function renderSingleDeckView(deckId) {
+            try {
+                const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+                const deckSnap = await getDoc(deckRef);
+                if (!deckSnap.exists()) {
+                    console.error("Deck not found");
+                    renderDecksView(allUserDecks);
+                    return;
+                }
+                const deck = { id: deckSnap.id, ...deckSnap.data() };
+                const cards = deck.cards || [];
+                setHeader(deck.topic);
+                
+                const content = document.getElementById('app-content');
+                content.innerHTML = `
+                    <div class="flex flex-col space-y-4">
+                       <div class="flex items-center justify-between">
+                           <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
+                               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                               Back to My Decks
+                           </button>
+                           <div class="flex space-x-2">
+                               <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Card</button>
+                               <button id="start-quiz-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" ${cards.length === 0 ? 'disabled' : ''}>Start Quiz</button>
+                           </div>
+                       </div>
+                        <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                            <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                                ${cards.length > 0 ? cards.map((card, index) => `
+                                    <li class="p-4 flex items-center justify-between">
+                                        <div class="flex-1 mr-4 min-w-0">
+                                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
+                                        </div>
+                                        <div class="flex items-center flex-shrink-0">
+                                            <button class="edit-card-btn text-gray-400 hover:text-blue-500 mr-2" data-index="${index}">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                                            </button>
+                                            <button class="delete-card-btn text-gray-400 hover:text-red-500" data-index="${index}">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            </button>
+                                        </div>
+                                    </li>
+                                `).join('') : `<li class="p-6 text-center text-gray-500">No cards in this deck yet.</li>`}
+                            </ul>
+                        </div>
+                    </div>`;
 
-    // Use v1 API with gemini-1.5-flash, leveraging global geminiApiKey
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }]
-            }),
-        });
+                document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
+                document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
+                document.getElementById('start-quiz-btn').addEventListener('click', () => renderQuizModal(deck));
+                
+                document.querySelectorAll('.edit-card-btn').forEach(btn => {
+                    const cardIndex = parseInt(btn.dataset.index);
+                    const cardToEdit = cards[cardIndex];
+                    btn.addEventListener('click', () => {
+                        renderEditCardModal(deckId, cardIndex, cardToEdit);
+                    });
+                });
 
-        if (!response.ok) {
-            const errorBody = await response.text();
-            console.error(`Gemini API Error: ${response.status} - ${response.statusText}`, errorBody);
-            if (response.status === 403) {
-                return 'API key restricted or not authorized. Check Google Cloud Console for restrictions.';
-            } else if (response.status === 429) {
-                return 'API quota exceeded. Try again later or check Google Cloud Console for limits.';
+                document.querySelectorAll('.delete-card-btn').forEach(btn => btn.addEventListener('click', () => {
+                    deleteCard(deckId, parseInt(btn.dataset.index));
+                }));
+            } catch (error) {
+                console.error("Error fetching single deck:", error);
             }
-            throw new Error(`API Error: ${response.status}`);
         }
 
-        const data = await response.json();
-        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No explanation generated.';
-        return generatedText.trim();
-    } catch (error) {
-        console.error('Error generating explanation:', error);
-        return `This flashcard asks: ${question}. The answer, "${answer}", is a key concept to understand. Review it a few times to remember it clearly!`;
-    }
-}
-
-// --- Explanation Modal ---
-function renderExplanationModal(explanation, question, answer) {
-    const modalContent = `
-        <div class="space-y-4">
-            <h4 class="text-md font-semibold text-gray-900 dark:text-white">Explanation</h4>
-            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <p class="text-sm text-gray-700 dark:text-gray-300">${explanation}</p>
-            </div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-                <p><strong>Question:</strong> ${question}</p>
-                <p><strong>Answer:</strong> ${answer}</p>
-            </div>
-        </div>
-    `;
-
-    renderModal('explanation-modal', 'Detailed Explanation', modalContent, () => {}, '');
-    const modal = document.getElementById('explanation-modal');
-    modal.querySelector('#modal-save-btn').style.display = 'none';
-    modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
-}
-
-// --- Study Mode Modal ---
-function renderStudyModal(deck) {
-    const cards = deck.cards || [];
-    if (cards.length === 0) {
-        alert("This deck has no cards to study.");
-        return;
-    }
-
-    let currentCardIndex = 0;
-    let isFlipped = false;
-
-    const renderCardContent = () => {
-        const card = cards[currentCardIndex];
-        return `
-            <div class="scene w-full h-64 cursor-pointer" id="study-card-container">
-                <div class="card ${isFlipped ? 'is-flipped' : ''} w-full h-full relative">
-                    <div class="card-face absolute w-full h-full bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center justify-center p-4">
-                        <p class="text-lg text-gray-900 dark:text-white text-center" id="question-text">${card.question}</p>
-                    </div>
-                    <div class="card-face card-face-back absolute w-full h-full bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center justify-center p-4">
-                        <p class="text-lg text-gray-900 dark:text-white text-center" id="answer-text">${card.answer}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-4 flex justify-center ${isFlipped ? '' : 'hidden'}" id="explain-btn-container">
-                <button id="explain-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                    Explain
-                </button>
-            </div>
-        `;
-    };
-
-    const modalContent = `
-        <div class="flex flex-col h-full">
-            <div class="flex-grow" id="study-card-content">
-                ${renderCardContent()}
-            </div>
-            <div class="flex justify-between mt-4">
-                <button id="study-prev-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 ${currentCardIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${currentCardIndex === 0 ? 'disabled' : ''}>
-                    Previous
-                </button>
-                <button id="study-next-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 ${currentCardIndex === cards.length - 1 ? 'opacity-50 cursor-not-allowed' : ''}" ${currentCardIndex === cards.length - 1 ? 'disabled' : ''}>
-                    Next
-                </button>
-            </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 text-center mt-2" id="card-counter">Card ${currentCardIndex + 1} of ${cards.length}</p>
-        </div>
-    `;
-
-    renderModal('study-modal', `Study: ${deck.topic}`, modalContent, () => {}, '');
-
-    const modal = document.getElementById('study-modal');
-    modal.querySelector('#modal-save-btn').style.display = 'none';
-    modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
-
-    const updateCardDisplay = () => {
-        const card = cards[currentCardIndex];
-        const questionElement = document.getElementById('question-text');
-        const answerElement = document.getElementById('answer-text');
-        const explainBtnContainer = document.getElementById('explain-btn-container');
-        const cardCounter = document.getElementById('card-counter');
-        const cardElement = document.querySelector('#study-card-container .card');
-
-        if (questionElement && answerElement) {
-            questionElement.textContent = card.question;
-            answerElement.textContent = card.answer;
-        }
-
-        cardElement.classList.toggle('is-flipped', isFlipped);
-        explainBtnContainer.classList.toggle('hidden', !isFlipped);
-        cardCounter.textContent = `Card ${currentCardIndex + 1} of ${cards.length}`;
-
-        // Update button states
-        const prevBtn = document.getElementById('study-prev-btn');
-        const nextBtn = document.getElementById('study-next-btn');
-        prevBtn.disabled = currentCardIndex === 0;
-        prevBtn.classList.toggle('opacity-50', currentCardIndex === 0);
-        prevBtn.classList.toggle('cursor-not-allowed', currentCardIndex === 0);
-        nextBtn.disabled = currentCardIndex === cards.length - 1;
-        nextBtn.classList.toggle('opacity-50', currentCardIndex === cards.length - 1);
-        nextBtn.classList.toggle('cursor-not-allowed', currentCardIndex === cards.length - 1);
-
-        // Attach explain button event listener
-        const explainBtn = document.getElementById('explain-btn');
-        if (explainBtn && isFlipped) {
-            explainBtn.replaceWith(explainBtn.cloneNode(true));
-            const newExplainBtn = document.getElementById('explain-btn');
-            newExplainBtn.addEventListener('click', async () => {
-                newExplainBtn.disabled = true;
-                newExplainBtn.textContent = 'Generating...';
-                const explanation = await generateExplanation(card.question, card.answer);
-                renderExplanationModal(explanation, card.question, card.answer);
-                newExplainBtn.disabled = false;
-                newExplainBtn.textContent = 'Explain';
-            });
-        }
-    };
-
-    // Initial card click event listener
-    const cardContainer = document.getElementById('study-card-container');
-    cardContainer.addEventListener('click', (e) => {
-        if (e.target.closest('#explain-btn-container')) return;
-        isFlipped = !isFlipped;
-        updateCardDisplay();
-    });
-
-    document.getElementById('study-prev-btn').addEventListener('click', () => {
-        if (currentCardIndex > 0) {
-            currentCardIndex--;
-            isFlipped = false;
-            updateCardDisplay();
-        }
-    });
-
-    document.getElementById('study-next-btn').addEventListener('click', () => {
-        if (currentCardIndex < cards.length - 1) {
-            currentCardIndex++;
-            isFlipped = false;
-            updateCardDisplay();
-        }
-    });
-
-    updateCardDisplay();
-}
-
-// --- Single Deck View ---
-function renderSingleDeckView(deckId) {
-    setHeader('My Decks');
-    const content = document.getElementById('app-content');
-    const deck = allUserDecks.find(d => d.id === deckId);
-    if (!deck) {
-        content.innerHTML = `<div class="text-center text-red-500">Deck not found.</div>`;
-        return;
-    }
-
-    const cards = deck.cards || [];
-    const isPublic = deck.isPublic || false;
-
-    content.innerHTML = `
-        <div class="flex flex-col space-y-4">
-            <div class="flex items-center justify-between">
-                <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                    Back to My Decks
-                </button>
-                <div class="flex space-x-2">
-                    <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Add Card</button>
-                    <button id="publish-deck-btn" class="px-4 py-2 text-sm font-medium text-white ${isPublic ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} rounded-lg" ${isPublic ? 'disabled' : ''}>
-                        ${isPublic ? 'Published' : 'Publish Deck'}
-                    </button>
-                    <button id="study-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700" ${cards.length === 0 ? 'disabled' : ''}>
-                        Study
-                    </button>
-                    <button id="rename-deck-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600">Rename</button>
-                    <button id="delete-deck-btn" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">Delete</button>
-                </div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                <h3 class="text-lg font-semibold">${deck.topic}</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">${cards.length} cards</p>
-            </div>
-            <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
-                <ul class="divide-y divide-gray-200 dark:divide-gray-700">
-                    ${cards.length > 0 ? cards.map((card, index) => `
-                        <li class="p-4 flex items-center justify-between">
-                            <div class="flex-1 mr-4 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
-                                <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button class="edit-card-btn px-3 py-1 text-sm text-blue-600 hover:underline" data-index="${index}">Edit</button>
-                                <button class="delete-card-btn px-3 py-1 text-sm text-red-600 hover:underline" data-index="${index}">Delete</button>
-                            </div>
-                        </li>
-                    `).join('') : `<li class="p-6 text-center text-gray-500">This deck has no cards. Add some to get started!</li>`}
-                </ul>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
-    document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
-    document.getElementById('publish-deck-btn').addEventListener('click', () => {
-        if (!isPublic) renderPublishDeckModal(deckId);
-    });
-    document.getElementById('study-btn').addEventListener('click', () => renderStudyModal(deck));
-    document.getElementById('rename-deck-btn').addEventListener('click', () => renderRenameDeckModal(deckId, deck.topic));
-    document.getElementById('delete-deck-btn').addEventListener('click', () => {
-        if (confirm('Are you sure you want to delete this deck?')) {
-            deleteDeck(deckId);
-        }
-    });
-
-    document.querySelectorAll('.edit-card-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const index = parseInt(btn.dataset.index);
-            renderEditCardModal(deckId, index, cards[index]);
-        });
-    });
-
-    document.querySelectorAll('.delete-card-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const index = parseInt(btn.dataset.index);
-            if (confirm('Are you sure you want to delete this card?')) {
-                deleteCard(deckId, index);
-            }
-        });
-    });
-}
         function renderProgressView() {
             setActiveNav('nav-progress');
             setHeader('Progress Tracker');
@@ -1782,293 +1578,95 @@ function renderSingleDeckView(deckId) {
                 }
             });
         }
-
-        async function generateQuizWithAI(deck) {
-            const cardContent = deck.cards.map(c => `Q: ${c.question}\nA: ${c.answer}`).join('\n\n');
-            const questionCount = Math.max(deck.cards.length, 5); 
-
-            const prompt = `
-Generate a multiple-choice quiz based on the text I provide below.
-You must follow these specific rules for the quiz's design:
-
-Concise Options: Make all answer options (both correct and incorrect) as concise and least detailed as possible.
-Answer Length: Avoid making the correct answer consistently the longest option. The correct answer should often be shorter than or roughly equal in length to the incorrect options (distractors).
-Randomized Position: Randomly mix the position of the correct answer (A, B, C, D) for each question.
-JSON Output: The response MUST be a valid JSON array of objects. Each object must have keys "question", "options" (an array of 4 strings), and "correctAnswer" (a string matching one of the options). Do NOT include explanations or markdown.
-
-[Here is the text to use for the quiz]:
----
-${cardContent}
----
-Quiz should have exactly ${questionCount} questions.
+        
+        function renderQuizModal(deck) {
+            let currentCardIndex = 0;
+            
+            const modalContent = `
+                <div id="quiz-content" class="h-96 flex flex-col items-center justify-center">
+                    <!-- Card will be rendered here -->
+                </div>
             `;
 
-            try {
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { responseMimeType: "application/json" } 
-                    })
-                });
-
-                if (!response.ok) { /* ... error handling ... */ }
-                
-                const result = await response.json();
-                const aiResponseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!aiResponseText) { /* ... error handling ... */ }
-                
-                const quizData = JSON.parse(aiResponseText);
-                if (!Array.isArray(quizData) || quizData.some(q => !q.question || !Array.isArray(q.options) || q.options.length !== 4 || !q.correctAnswer || !q.options.includes(q.correctAnswer))) {
-                     /* ... error handling ... */
-                }
-
-                // --- START OF NEW CODE ---
-                // Process the quiz data to shuffle options
-                const processedQuiz = quizData.map(q => {
-                    const shuffledOptions = shuffleArray([...q.options]); // Shuffle a copy
-                    return {
-                        question: q.question,
-                        options: shuffledOptions,
-                        correctAnswer: q.correctAnswer // Correct answer text remains the same
-                    };
-                });
-                return processedQuiz;
-                // --- END OF NEW CODE ---
-
-            } catch (error) {
-                console.error("Error generating quiz with AI:", error);
-                if (error instanceof SyntaxError) {
-                    alert("The AI returned data in an unexpected format. Please try generating the quiz again.");
-                }
-                throw error;
-            }
-        }
-
-        function renderAIGeneratedQuizView(quizQuestions, deck) {
-            setHeader(`Quiz: ${deck.topic}`);
-            const content = document.getElementById('app-content');
-            let currentQuestionIndex = 0;
-            let score = 0;
-            let userAnswers = []; // Array to track all answers and skips
-
-            function displayQuestion() {
-                if (currentQuestionIndex >= quizQuestions.length) {
-                    renderQuizResultsView(score, quizQuestions.length, deck, userAnswers);
+            renderModal('quiz-modal', `${deck.topic} Quiz`, modalContent, () => {}, '');
+            // Hide default save/cancel buttons for quiz
+            const quizModal = document.getElementById('quiz-modal');
+            quizModal.querySelector('#modal-save-btn').style.display = 'none';
+            quizModal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none'; // Hide cancel button in footer too
+            
+            function showCard(index) {
+                const quizContent = document.getElementById('quiz-content');
+                if (!deck.cards || index >= deck.cards.length) {
+                    quizContent.innerHTML = `<div class="text-center">
+                        <h2 class="text-2xl font-bold mb-4">Quiz Complete!</h2>
+                        <button id="quiz-close-btn-final" class="px-4 py-2 text-white bg-blue-600 rounded-lg">Close Quiz</button>
+                    </div>`;
+                     document.getElementById('quiz-close-btn-final').addEventListener('click', () => document.getElementById('quiz-modal').remove());
                     return;
                 }
 
-                const q = quizQuestions[currentQuestionIndex];
-                content.innerHTML = `
-                    <div class="max-w-2xl mx-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <p class="text-sm text-gray-500">Question ${currentQuestionIndex + 1} of ${quizQuestions.length}</p>
-                            <p class="text-sm font-bold">Score: ${score}</p>
-                        </div>
-                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                            <p class="text-lg font-medium mb-6">${q.question}</p>
-                            <div id="quiz-options" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                ${q.options.map(option => `
-                                    <button class="quiz-option p-4 border dark:border-gray-600 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                        ${option}
-                                    </button>
-                                `).join('')}
+                const cardData = deck.cards[index];
+                quizContent.innerHTML = `
+                    <p class="text-sm text-gray-500 mb-2">${index + 1} / ${deck.cards.length}</p>
+                    <div class="scene w-full h-64">
+                        <div id="quiz-card" class="card relative w-full h-full cursor-pointer">
+                            <div class="card-face absolute w-full h-full flex items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-lg">
+                                <p class="text-xl text-center">${cardData.question}</p>
                             </div>
-                            <div id="quiz-feedback" class="mt-6 flex justify-center items-center">
-                                <button id="skip-question-btn" class="px-6 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Skip</button>
+                            <div class="card-face card-face-back absolute w-full h-full flex items-center justify-center p-6 bg-blue-100 dark:bg-blue-900 rounded-lg shadow-lg">
+                                 <p class="text-xl text-center font-semibold">${cardData.answer}</p>
                             </div>
                         </div>
                     </div>
+                     <div id="explain-btn-container" class="h-12 mt-4 flex justify-center items-center">
+                        <!-- Explain button will be dynamically added here -->
+                    </div>
+                    <div class="mt-2 flex items-center justify-center space-x-4">
+                        <button id="prev-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600" ${index === 0 ? 'disabled' : ''}>Previous</button>
+                        <button id="flip-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600">Flip</button>
+                        <button id="next-card-btn" class="px-6 py-2 rounded-lg bg-blue-600 text-white">Next</button>
+                    </div>
                 `;
 
-                // Handle selecting an answer
-                document.querySelectorAll('.quiz-option').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const selectedAnswer = e.currentTarget.textContent.trim();
-                        const isCorrect = selectedAnswer === q.correctAnswer;
-                        
-                        userAnswers.push({
-                            question: q.question,
-                            options: q.options,
-                            correctAnswer: q.correctAnswer,
-                            userAnswer: selectedAnswer,
-                            status: isCorrect ? 'correct' : 'incorrect'
-                        });
-
-                        document.querySelectorAll('.quiz-option').forEach(btn => btn.disabled = true);
-                        if (isCorrect) {
-                            score++;
-                            e.currentTarget.classList.add('bg-green-500', 'text-white');
-                        } else {
-                            e.currentTarget.classList.add('bg-red-500', 'text-white');
-                            document.querySelectorAll('.quiz-option').forEach(btn => {
-                                if (btn.textContent.trim() === q.correctAnswer) {
-                                    btn.classList.add('bg-green-500', 'text-white');
-                                }
-                            });
-                        }
-                        
-                        document.getElementById('quiz-feedback').innerHTML = `
-                            <button id="next-question-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Next</button>
-                        `;
-                        document.getElementById('next-question-btn').addEventListener('click', () => {
-                            currentQuestionIndex++;
-                            displayQuestion();
-                        });
-                    });
+                const cardElement = document.getElementById('quiz-card');
+                
+                // Event delegation for card flip and explain button
+                cardElement.addEventListener('click', (e) => {
+                    // Check if the click target is the explain button or inside it
+                    if (e.target.closest('#explain-card-btn')) {
+                        e.stopPropagation(); // Prevent the card from flipping
+                        renderChatbotModal(cardData);
+                    } else {
+                        // If not the explain button, flip the card
+                        cardElement.classList.toggle('is-flipped');
+                    }
+                });
+                
+                // Listener for the separate "Flip" button
+                document.getElementById('flip-card-btn').addEventListener('click', () => {
+                    cardElement.classList.toggle('is-flipped');
+                });
+                
+                document.getElementById('next-card-btn').addEventListener('click', () => {
+                    currentCardIndex++;
+                    showCard(currentCardIndex);
                 });
 
-                // Handle skipping a question
-                document.getElementById('skip-question-btn').addEventListener('click', () => {
-                    userAnswers.push({
-                        question: q.question,
-                        options: q.options,
-                        correctAnswer: q.correctAnswer,
-                        userAnswer: null,
-                        status: 'skipped'
+                const prevButton = document.getElementById('prev-card-btn');
+                if(prevButton) {
+                    prevButton.addEventListener('click', () => {
+                        currentCardIndex--;
+                        showCard(currentCardIndex);
                     });
-                    currentQuestionIndex++;
-                    displayQuestion();
-                });
-            }
-
-            displayQuestion();
-        }
-
-        function renderQuizResultsView(score, totalQuestions, deck, userAnswers) {
-            setHeader(`Quiz Results: ${deck.topic}`);
-            const content = document.getElementById('app-content');
-            const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
-            const correctCount = userAnswers.filter(a => a.status === 'correct').length;
-            const incorrectCount = userAnswers.filter(a => a.status === 'incorrect').length;
-            const skippedCount = userAnswers.filter(a => a.status === 'skipped').length;
-
-            let resultMessage = "";
-            let messageColorClass = "text-gray-900 dark:text-white"; 
-
-            if (percentage >= 91) { // A1
-                resultMessage = "Outstanding! You absolutely crushed it! 🎉";
-                messageColorClass = "text-green-600 dark:text-green-400";
-            } else if (percentage >= 81) { // A2
-                resultMessage = "Excellent work! You really know your stuff. 👍";
-                messageColorClass = "text-green-500 dark:text-green-400";
-            } else if (percentage >= 71) { // B1
-                resultMessage = "Great job! Solid performance. 😊";
-                messageColorClass = "text-blue-600 dark:text-blue-400";
-            } else if (percentage >= 61) { // B2
-                resultMessage = "Good effort! You're getting there. 😉";
-                messageColorClass = "text-blue-500 dark:text-blue-400";
-            } else if (percentage >= 51) { // C1
-                resultMessage = "Nice try! Keep practicing. 🙂";
-            } else if (percentage >= 41) { // C2
-                resultMessage = "Not bad! A little more review might help. 🤔";
-            } else if (percentage >= 33) { // D
-                resultMessage = "Keep working on it! You can improve. 💪";
-                messageColorClass = "text-yellow-600 dark:text-yellow-400";
-            } else { // E (Fail)
-                resultMessage = "Don't give up! Review the material and try again. 🙏";
-                messageColorClass = "text-red-600 dark:text-red-400";
-            }
-
-            let scoreColorClass = 'text-red-500 border-red-500';
-            if (percentage >= 75) {
-                scoreColorClass = 'text-green-500 border-green-500';
-            } else if (percentage >= 50) {
-                scoreColorClass = 'text-yellow-500 border-yellow-500';
-            }
-
-            const reviewHTML = userAnswers.map((answer, index) => {
-                const questionNumber = index + 1;
-                let statusIcon = '';
-                if (answer.status === 'correct') {
-                    statusIcon = `<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
-                } else if (answer.status === 'incorrect') {
-                    statusIcon = `<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>`;
-                } else {
-                    statusIcon = `<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>`;
                 }
+            }
 
-                const optionsHTML = Array.isArray(answer.options) ? answer.options.map(option => {
-                    let optionClass = 'border-gray-300 dark:border-gray-600';
-                    if (option === answer.correctAnswer) {
-                        optionClass = 'border-green-500 bg-green-50 dark:bg-green-900/50 text-green-800 dark:text-green-300 font-bold';
-                    }
-                    if (answer.status === 'incorrect' && option === answer.userAnswer) {
-                        optionClass = 'border-red-500 bg-red-50 dark:bg-red-900/50 text-red-800 dark:text-red-300';
-                    }
-                    return `<div class="p-3 border rounded-md ${optionClass}">${option}</div>`;
-                }).join('') : '<p class="text-red-500 text-sm">Error: Could not display options for this question.</p>';
-
-                return `
-                    <div class="py-4 border-b dark:border-gray-700">
-                        <div class="flex items-start">
-                            <div class="flex-shrink-0 mr-3">${statusIcon}</div>
-                            <div class="flex-1">
-                                <p class="mb-4">${questionNumber}. ${answer.question || 'Question not available.'}</p>
-                                <div class="space-y-2">
-                                    ${optionsHTML} 
-                                </div>
-                                ${answer.status === 'skipped' ? '<p class="text-sm text-yellow-500 mt-2">You skipped this question.</p>' : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            // --- THIS IS THE FIX ---
-            // The full HTML block was missing.
-            content.innerHTML = `
-                <div class="max-w-4xl mx-auto">
-                    <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-                        <h2 class="text-2xl font-bold mb-4 ${messageColorClass}">${resultMessage}</h2> 
-                        <div class="flex justify-center items-center space-x-12">
-                            <div class="flex flex-col items-center">
-                                <div class="w-32 h-32 flex items-center justify-center border-4 ${scoreColorClass} rounded-full mb-2">
-                                    <span class="text-4xl font-bold ${scoreColorClass}">${percentage}%</span>
-                                </div>
-                                <span class="font-semibold text-lg">Score</span>
-                            </div>
-                            <div class="text-left space-y-4">
-                                <div class="flex items-center">
-                                    <svg class="w-6 h-6 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                                    <span><strong class="text-gray-900 dark:text-white">${correctCount}</strong> Correct</span>
-                                </div>
-                                <div class="flex items-center">
-                                    <svg class="w-6 h-6 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
-                                    <span><strong class="text-gray-900 dark:text-white">${incorrectCount}</strong> Incorrect</span>
-                                </div>
-                                <div class="flex items-center">
-                                    <svg class="w-6 h-6 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
-                                    <span><strong class="text-gray-900 dark:text-white">${skippedCount}</strong> Skipped</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                        <h3 class="text-xl font-bold mb-4">Review your answers</h3>
-                        <div id="quiz-review-list">
-                            ${reviewHTML}
-                        </div>
-                    </div>
-                    
-                    <div class="mt-8 flex justify-center space-x-4">
-                        <button id="quiz-again-btn" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Try Again</button>
-                        <button id="quiz-decks-btn" class="px-8 py-3 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 font-semibold">Back to Decks</button>
-                    </div>
-                </div>
-            `;
-            // --- END OF FIX ---
-            
-            document.getElementById('quiz-again-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
-            document.getElementById('quiz-decks-btn').addEventListener('click', () => renderDecksView(allUserDecks));
+            showCard(currentCardIndex);
         }
-
+        
         function renderQuizSelectionModal(decks) {
             const modalContent = `
-                <div id="quiz-deck-selection" class="space-y-2 max-h-96 overflow-y-auto">
+                <div id="quiz-deck-selection" class="space-y-2">
                     ${decks.map(deck => `
                         <button class="w-full text-left p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" data-deck-id="${deck.id}">
                             ${deck.topic}
@@ -2089,9 +1687,9 @@ Quiz should have exactly ${questionCount} questions.
                     if (selectedDeck) {
                         selectionModal.remove();
                         if (selectedDeck.cards && selectedDeck.cards.length > 0) {
-                            startAIGeneratedQuiz(selectedDeck); // This starts the new AI quiz
+                            renderQuizModal(selectedDeck);
                         } else {
-                            alert('This deck has no cards to generate a quiz from!');
+                            alert('This deck has no cards to quiz!');
                         }
                     }
                 }
@@ -2153,30 +1751,6 @@ Quiz should have exactly ${questionCount} questions.
                 }
             });
         }
-async function startAIGeneratedQuiz(deck) {
-            setHeader(`Generating Quiz...`);
-            const content = document.getElementById('app-content');
-            content.innerHTML = `
-                <div class="text-center py-20">
-                    <svg class="svg-loader mx-auto" style="width: 50px; height: 50px;" viewBox="25 25 50 50">
-                        <circle class="svg-loader-path" cx="50" cy="50" r="20" fill="none" stroke-width="5" />
-                    </svg>
-                    <p class="mt-4 text-lg font-medium text-gray-700 dark:text-gray-300">Our AI is building your quiz...</p>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">This may take a moment. Please wait.</p>
-                </div>
-            `;
-
-            try {
-                const quizQuestions = await generateQuizWithAI(deck);
-                if (quizQuestions && quizQuestions.length > 0) {
-                    renderAIGeneratedQuizView(quizQuestions, deck);
-                } else {
-                    throw new Error("AI did not return any questions.");
-                }
-            } catch (error) {
-                content.innerHTML = `<div class="text-center text-red-500">Failed to generate the quiz. Please try again.</div>`;
-            }
-        }
 
         // --- AUTHENTICATION LOGIC ---
 
@@ -2188,38 +1762,14 @@ async function startAIGeneratedQuiz(deck) {
             }
         }
 
-async function createUserProfile(user, username) {
-            try {
-                // Use a transaction to ensure username uniqueness
-                await runTransaction(db, async (transaction) => {
-                    const usernameRef = doc(db, `artifacts/${appId}/usernames`, username.toLowerCase());
-                    const usernameDoc = await transaction.get(usernameRef);
-
-                    if (usernameDoc.exists()) {
-                        throw new Error("Username is already taken."); // This will cancel the transaction
-                    }
-
-                    // Username is available, so create all necessary documents
-                    // 1. Create the username lookup document
-                    transaction.set(usernameRef, { userId: user.uid });
-                    
-                    // 2. Write to the main user document for searching
-                    const userRef = doc(db, `/artifacts/${appId}/users`, user.uid);
-                    transaction.set(userRef, { username: username }, { merge: true });
-
-                    // 3. Write to the profile subcollection for display
-                    const profileRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'details');
-                    transaction.set(profileRef, {
-                        username: username,
-                        following: 0,
-                        followers: 0
-                    });
-                });
-            } catch (error) {
-                // Re-throw the error so handleSignUp can catch it and show the user
-                throw error;
-            }
+        async function createUserProfile(user, username) {
+             await setDoc(doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'details'), {
+                username: username,
+                following: 0,
+                followers: 0
+            });
         }
+
         async function handleSignUp() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -2236,8 +1786,6 @@ async function createUserProfile(user, username) {
                     showAuthError('An account with this email already exists.');
                 } else if (error.code === 'auth/weak-password') {
                     showAuthError('Password should be at least 6 characters.');
-                } else if (error.message === "Username is already taken.") {
-                    showAuthError('This username is already taken. Please choose another.');
                 } else {
                     showAuthError('An error occurred during sign up.');
                 }
@@ -2293,53 +1841,116 @@ async function createUserProfile(user, username) {
         }
 
         // --- DATA LOGIC ---
-        
-        async function updateUserProfile(newUsername) {
-            if (!userId || !newUsername || !userProfile) return;
-            const oldUsername = userProfile.username;
 
-            if (oldUsername.toLowerCase() === newUsername.toLowerCase()) {
-                return; // No change needed
+        async function handleUserSearch() {
+            const searchInput = document.getElementById('user-search-input');
+            const resultsContainer = document.getElementById('user-search-results');
+            const searchTerm = searchInput.value.trim();
+
+            if (searchTerm.length < 3) {
+                resultsContainer.innerHTML = `<p class="text-center text-sm text-gray-500">Please enter at least 3 characters.</p>`;
+                return;
             }
+            resultsContainer.innerHTML = `<div class="flex justify-center items-center h-full"><div class="loader"></div></div>`;
+            
+            try {
+                // NOTE: This query requires a composite index in Firestore. 
+                // The error message in the browser console will provide a direct link to create it.
+                const usersRef = collection(db, `users`);
+                const q = query(usersRef, where("username", ">=", searchTerm), where("username", "<=", searchTerm + '\uf8ff'));
+                
+                const querySnapshot = await getDocs(q);
+                
+                let resultsHTML = '';
+                if(querySnapshot.empty) {
+                    resultsHTML = `<p class="text-center text-sm text-gray-500">No users found.</p>`;
+                } else {
+                    querySnapshot.forEach(doc => {
+                        const userData = doc.data();
+                        // Assumes the document ID is the user's UID
+                        const targetUserId = doc.id;
 
+                        // Skip the current user in search results
+                        if (targetUserId === userId) return;
+
+                        resultsHTML += `
+                            <div class="flex items-center justify-between p-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                                <span class="font-medium">${userData.username}</span>
+                                <button class="follow-user-btn px-3 py-1 text-sm text-white bg-green-600 rounded-md hover:bg-green-700" data-user-id="${targetUserId}">Follow</button>
+                            </div>
+                        `;
+                    });
+                }
+                resultsContainer.innerHTML = resultsHTML;
+
+                // Add event listeners for new follow buttons
+                 resultsContainer.querySelectorAll('.follow-user-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        toggleFollow(e.target.dataset.userId);
+                        // Visually disable the button after click
+                        e.target.textContent = 'Following';
+                        e.target.disabled = true;
+                        e.target.classList.remove('bg-green-600', 'hover:bg-green-700');
+                        e.target.classList.add('bg-gray-400', 'cursor-not-allowed');
+                    });
+                });
+
+            } catch (error) {
+                console.error("Error searching for users:", error);
+                resultsContainer.innerHTML = `<p class="text-center text-sm text-red-500">Error searching for users. You may need to create a Firestore index.</p>`;
+                // Firestore will log a helpful error message to the console with a link to create the necessary index.
+            }
+        }
+        
+        async function toggleFollow(profileUserId) {
+            const currentUserId = auth.currentUser.uid;
+            if (currentUserId === profileUserId) return; // Can't follow yourself
+        
+            const currentUserProfileRef = doc(db, `/artifacts/${appId}/users/${currentUserId}/profile`, 'details');
+            const targetUserProfileRef = doc(db, `/artifacts/${appId}/users/${profileUserId}/profile`, 'details');
+            const followingRef = doc(db, `/artifacts/${appId}/users/${currentUserId}/following`, profileUserId);
+        
             try {
                 await runTransaction(db, async (transaction) => {
-                    // 1. Check if the NEW username is already taken
-                    const newUsernameRef = doc(db, `artifacts/${appId}/usernames`, newUsername.toLowerCase());
-                    const newUsernameDoc = await transaction.get(newUsernameRef);
-                    if (newUsernameDoc.exists()) {
-                        throw new Error("Username is already taken.");
+                    const followingDoc = await transaction.get(followingRef);
+                    const currentUserProfileDoc = await transaction.get(currentUserProfileRef);
+                    const targetUserProfileDoc = await transaction.get(targetUserProfileRef);
+        
+                    if (!currentUserProfileDoc.exists() || !targetUserProfileDoc.exists()) {
+                        throw "User profile not found.";
                     }
-                    
-                    const oldUsernameRef = doc(db, `artifacts/${appId}/usernames`, oldUsername.toLowerCase());
-                    const oldUsernameDoc = await transaction.get(oldUsernameRef);
-
-                    // 2. Only check and delete the old username document IF it exists
-                    if (oldUsernameDoc.exists()) {
-                        if (oldUsernameDoc.data().userId !== userId) {
-                            throw new Error("Cannot change a username you don't own due to a data conflict.");
-                        }
-                        transaction.delete(oldUsernameRef);
+        
+                    const currentUserData = currentUserProfileDoc.data();
+                    const targetUserData = targetUserProfileDoc.data();
+        
+                    if (followingDoc.exists()) {
+                        // Unfollow
+                        transaction.delete(followingRef);
+                        transaction.update(currentUserProfileRef, { following: (currentUserData.following || 1) - 1 });
+                        transaction.update(targetUserProfileRef, { followers: (targetUserData.followers || 1) - 1 });
+                    } else {
+                        // Follow
+                        transaction.set(followingRef, { userId: profileUserId });
+                        transaction.update(currentUserProfileRef, { following: (currentUserData.following || 0) + 1 });
+                        transaction.update(targetUserProfileRef, { followers: (targetUserData.followers || 0) + 1 });
                     }
-                    
-                    // 3. Create the new username document
-                    transaction.set(newUsernameRef, { userId: userId });
-
-                    // --- START OF FIX ---
-                    // 4. Update (or create) the main user document for searching
-                    const userRef = doc(db, `/artifacts/${appId}/users`, userId);
-                    // Use set with merge:true instead of update
-                    transaction.set(userRef, { username: newUsername }, { merge: true });
-                    // --- END OF FIX ---
-
-                    // 5. Update the profile subcollection for display
-                    const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
-                    transaction.update(profileRef, { username: newUsername });
                 });
-                alert('Profile updated successfully!');
+                // Re-render the public profile view to show the updated button and counts
+                renderPublicProfileView(profileUserId);
+            } catch (error) {
+                console.error("Error toggling follow:", error);
+                alert("Failed to update follow status.");
+            }
+        }
+        
+        async function updateUserProfile(newUsername) {
+            if (!userId || !newUsername) return;
+            try {
+                const profileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'details');
+                // Use setDoc with merge:true to create or update the document.
+                await setDoc(profileRef, { username: newUsername }, { merge: true });
             } catch (error) {
                 console.error("Error updating user profile:", error);
-                alert(`Error: ${error.message}`);
             }
         }
 
@@ -3871,6 +3482,7 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
+
 
 
 
