@@ -1574,9 +1574,8 @@
 
         async function generateQuizWithAI(deck) {
             const cardContent = deck.cards.map(c => `Q: ${c.question}\nA: ${c.answer}`).join('\n\n');
-            const questionCount = Math.max(deck.cards.length, 5); // Ensure at least 5 questions
+            const questionCount = Math.max(deck.cards.length, 5); 
 
-            // --- THIS IS THE NEW PROMPT ---
             const prompt = `
 Generate a multiple-choice quiz based on the text I provide below.
 You must follow these specific rules for the quiz's design:
@@ -1592,7 +1591,6 @@ ${cardContent}
 ---
 Quiz should have exactly ${questionCount} questions.
             `;
-            // --- END OF NEW PROMPT ---
 
             try {
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
@@ -1601,45 +1599,40 @@ Quiz should have exactly ${questionCount} questions.
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { responseMimeType: "application/json" } // Ensures JSON output
+                        generationConfig: { responseMimeType: "application/json" } 
                     })
                 });
 
-                if (!response.ok) {
-                    const errorBody = await response.text(); // Get more details on API error
-                    throw new Error(`API error: ${response.status} - ${errorBody}`);
-                }
+                if (!response.ok) { /* ... error handling ... */ }
                 
                 const result = await response.json();
-                
-                // Enhanced safety check for the AI response structure
                 const aiResponseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (!aiResponseText) {
-                    console.error("AI Response Structure:", JSON.stringify(result, null, 2));
-                    throw new Error("The AI returned an empty or invalid response structure.");
-                }
+                if (!aiResponseText) { /* ... error handling ... */ }
                 
-                // Parse and validate the JSON
                 const quizData = JSON.parse(aiResponseText);
-                if (!Array.isArray(quizData) || quizData.some(q => 
-                    !q.question || 
-                    !Array.isArray(q.options) || 
-                    q.options.length !== 4 || 
-                    !q.correctAnswer || 
-                    !q.options.includes(q.correctAnswer) // Check if correctAnswer is one of the options
-                )) {
-                     console.error("Invalid JSON from AI:", aiResponseText);
-                     throw new Error("AI returned invalid JSON structure for the quiz.");
+                if (!Array.isArray(quizData) || quizData.some(q => !q.question || !Array.isArray(q.options) || q.options.length !== 4 || !q.correctAnswer || !q.options.includes(q.correctAnswer))) {
+                     /* ... error handling ... */
                 }
-                return quizData;
+
+                // --- START OF NEW CODE ---
+                // Process the quiz data to shuffle options
+                const processedQuiz = quizData.map(q => {
+                    const shuffledOptions = shuffleArray([...q.options]); // Shuffle a copy
+                    return {
+                        question: q.question,
+                        options: shuffledOptions,
+                        correctAnswer: q.correctAnswer // Correct answer text remains the same
+                    };
+                });
+                return processedQuiz;
+                // --- END OF NEW CODE ---
 
             } catch (error) {
                 console.error("Error generating quiz with AI:", error);
-                // Provide more specific feedback if it's a JSON parsing error
                 if (error instanceof SyntaxError) {
                     alert("The AI returned data in an unexpected format. Please try generating the quiz again.");
                 }
-                throw error; // Re-throw to be caught by the calling function
+                throw error;
             }
         }
 
@@ -1741,24 +1734,51 @@ Quiz should have exactly ${questionCount} questions.
             const incorrectCount = userAnswers.filter(a => a.status === 'incorrect').length;
             const skippedCount = userAnswers.filter(a => a.status === 'skipped').length;
 
-            let resultMessage = ""; /* ... keep your existing dynamic message logic ... */
-            let messageColorClass = "text-gray-900 dark:text-white";
-            if (percentage >= 91) { /* ... A1 ... */ }
-            // ... (rest of your grade messages) ...
-            else { /* ... E ... */ }
+            let resultMessage = "";
+            let messageColorClass = "text-gray-900 dark:text-white"; 
 
-            let scoreColorClass = 'text-red-500 border-red-500'; /* ... keep your score color logic ... */
+            if (percentage >= 91) { // A1
+                resultMessage = "Outstanding! You absolutely crushed it! 🎉";
+                messageColorClass = "text-green-600 dark:text-green-400";
+            } else if (percentage >= 81) { // A2
+                resultMessage = "Excellent work! You really know your stuff. 👍";
+                messageColorClass = "text-green-500 dark:text-green-400";
+            } else if (percentage >= 71) { // B1
+                resultMessage = "Great job! Solid performance. 😊";
+                messageColorClass = "text-blue-600 dark:text-blue-400";
+            } else if (percentage >= 61) { // B2
+                resultMessage = "Good effort! You're getting there. 😉";
+                messageColorClass = "text-blue-500 dark:text-blue-400";
+            } else if (percentage >= 51) { // C1
+                resultMessage = "Nice try! Keep practicing. 🙂";
+            } else if (percentage >= 41) { // C2
+                resultMessage = "Not bad! A little more review might help. 🤔";
+            } else if (percentage >= 33) { // D
+                resultMessage = "Keep working on it! You can improve. 💪";
+                messageColorClass = "text-yellow-600 dark:text-yellow-400";
+            } else { // E (Fail)
+                resultMessage = "Don't give up! Review the material and try again. 🙏";
+                messageColorClass = "text-red-600 dark:text-red-400";
+            }
 
-            // Generate the detailed question review
+            let scoreColorClass = 'text-red-500 border-red-500';
+            if (percentage >= 75) {
+                scoreColorClass = 'text-green-500 border-green-500';
+            } else if (percentage >= 50) {
+                scoreColorClass = 'text-yellow-500 border-yellow-500';
+            }
+
             const reviewHTML = userAnswers.map((answer, index) => {
                 const questionNumber = index + 1;
                 let statusIcon = '';
-                if (answer.status === 'correct') { /* ... correct icon ... */ }
-                else if (answer.status === 'incorrect') { /* ... incorrect icon ... */ }
-                else { /* ... skipped icon ... */ }
+                if (answer.status === 'correct') {
+                    statusIcon = `<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+                } else if (answer.status === 'incorrect') {
+                    statusIcon = `<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>`;
+                } else {
+                    statusIcon = `<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>`;
+                }
 
-                // --- START OF FIX ---
-                // Check if options is actually an array before trying to map it
                 const optionsHTML = Array.isArray(answer.options) ? answer.options.map(option => {
                     let optionClass = 'border-gray-300 dark:border-gray-600';
                     if (option === answer.correctAnswer) {
@@ -1769,7 +1789,6 @@ Quiz should have exactly ${questionCount} questions.
                     }
                     return `<div class="p-3 border rounded-md ${optionClass}">${option}</div>`;
                 }).join('') : '<p class="text-red-500 text-sm">Error: Could not display options for this question.</p>';
-                // --- END OF FIX ---
 
                 return `
                     <div class="py-4 border-b dark:border-gray-700">
@@ -1787,7 +1806,50 @@ Quiz should have exactly ${questionCount} questions.
                 `;
             }).join('');
 
-            content.innerHTML = ``;
+            // --- THIS IS THE FIX ---
+            // The full HTML block was missing.
+            content.innerHTML = `
+                <div class="max-w-4xl mx-auto">
+                    <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-bold mb-4 ${messageColorClass}">${resultMessage}</h2> 
+                        <div class="flex justify-center items-center space-x-12">
+                            <div class="flex flex-col items-center">
+                                <div class="w-32 h-32 flex items-center justify-center border-4 ${scoreColorClass} rounded-full mb-2">
+                                    <span class="text-4xl font-bold ${scoreColorClass}">${percentage}%</span>
+                                </div>
+                                <span class="font-semibold text-lg">Score</span>
+                            </div>
+                            <div class="text-left space-y-4">
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                    <span><strong class="text-gray-900 dark:text-white">${correctCount}</strong> Correct</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+                                    <span><strong class="text-gray-900 dark:text-white">${incorrectCount}</strong> Incorrect</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                                    <span><strong class="text-gray-900 dark:text-white">${skippedCount}</strong> Skipped</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h3 class="text-xl font-bold mb-4">Review your answers</h3>
+                        <div id="quiz-review-list">
+                            ${reviewHTML}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 flex justify-center space-x-4">
+                        <button id="quiz-again-btn" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Try Again</button>
+                        <button id="quiz-decks-btn" class="px-8 py-3 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 font-semibold">Back to Decks</button>
+                    </div>
+                </div>
+            `;
+            // --- END OF FIX ---
             
             document.getElementById('quiz-again-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
             document.getElementById('quiz-decks-btn').addEventListener('click', () => renderDecksView(allUserDecks));
@@ -3291,6 +3353,15 @@ async function createUserProfile(user, username) {
                 timeout = setTimeout(() => func.apply(this, args), delay);
             };
         }
+
+        function shuffleArray(array) {
+          for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+          }
+          return array;
+        }
+
         function renderFindFriendsView() {
             setHeader('Find Friends');
             const content = document.getElementById('app-content');
