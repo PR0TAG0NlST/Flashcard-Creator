@@ -1125,6 +1125,7 @@
         }
         
         // --- Study Mode Modal ---
+// --- Study Mode Modal ---
 function renderStudyModal(deck) {
     const cards = deck.cards || [];
     if (cards.length === 0) {
@@ -1138,7 +1139,7 @@ function renderStudyModal(deck) {
     const renderCardContent = () => {
         const card = cards[currentCardIndex];
         return `
-            <div class="scene w-full h-64">
+            <div class="scene w-full h-64 cursor-pointer" id="study-card">
                 <div class="card ${isFlipped ? 'is-flipped' : ''} w-full h-full relative">
                     <div class="card-face absolute w-full h-full bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center justify-center p-4">
                         <p class="text-lg text-gray-900 dark:text-white text-center">${card.question}</p>
@@ -1147,6 +1148,11 @@ function renderStudyModal(deck) {
                         <p class="text-lg text-gray-900 dark:text-white text-center">${card.answer}</p>
                     </div>
                 </div>
+            </div>
+            <div class="mt-4 ${isFlipped ? '' : 'hidden'}" id="explain-btn-container">
+                <button id="explain-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                    Explain
+                </button>
             </div>
         `;
     };
@@ -1159,9 +1165,6 @@ function renderStudyModal(deck) {
             <div class="flex justify-between mt-4">
                 <button id="study-prev-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 ${currentCardIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${currentCardIndex === 0 ? 'disabled' : ''}>
                     Previous
-                </button>
-                <button id="study-flip-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                    Flip
                 </button>
                 <button id="study-next-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 ${currentCardIndex === cards.length - 1 ? 'opacity-50 cursor-not-allowed' : ''}" ${currentCardIndex === cards.length - 1 ? 'disabled' : ''}>
                     Next
@@ -1189,9 +1192,27 @@ function renderStudyModal(deck) {
         nextBtn.classList.toggle('opacity-50', currentCardIndex === cards.length - 1);
         nextBtn.classList.toggle('cursor-not-allowed', currentCardIndex === cards.length - 1);
         document.querySelector('.text-center.mt-2').textContent = `Card ${currentCardIndex + 1} of ${cards.length}`;
+
+        // Re-attach card click event listener
+        const card = document.getElementById('study-card');
+        card.addEventListener('click', () => {
+            isFlipped = !isFlipped;
+            updateCardDisplay();
+        });
+
+        // Attach explain button event listener if visible
+        const explainBtn = document.getElementById('explain-btn');
+        if (explainBtn) {
+            explainBtn.addEventListener('click', () => {
+                const card = cards[currentCardIndex];
+                const explanation = card.explanation || 'No explanation available for this card.';
+                alert(explanation);
+            });
+        }
     };
 
-    document.getElementById('study-flip-btn').addEventListener('click', () => {
+    // Initial card click event listener
+    document.getElementById('study-card').addEventListener('click', () => {
         isFlipped = !isFlipped;
         updateCardDisplay();
     });
@@ -1211,9 +1232,19 @@ function renderStudyModal(deck) {
             updateCardDisplay();
         }
     });
+
+    // Initial explain button event listener
+    const explainBtn = document.getElementById('explain-btn');
+    if (explainBtn) {
+        explainBtn.addEventListener('click', () => {
+            const card = cards[currentCardIndex];
+            const explanation = card.explanation || 'No explanation available for this card.';
+            alert(explanation);
+        });
+    }
 }
 
-// --- Updated Single Deck View ---
+// --- Single Deck View (Unchanged) ---
 function renderSingleDeckView(deckId) {
     setHeader('My Decks');
     const content = document.getElementById('app-content');
@@ -3773,4 +3804,5 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
+
 
