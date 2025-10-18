@@ -1125,7 +1125,6 @@
         }
         
 // --- Study Mode Modal ---
-// --- Study Mode Modal ---
 function renderStudyModal(deck) {
     const cards = deck.cards || [];
     if (cards.length === 0) {
@@ -1149,7 +1148,7 @@ function renderStudyModal(deck) {
                     </div>
                 </div>
             </div>
-            <div class="mt-4 ${isFlipped ? '' : 'hidden'}" id="explain-btn-container">
+            <div class="mt-4 flex justify-center ${isFlipped ? '' : 'hidden'}" id="explain-btn-container">
                 <button id="explain-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                     Explain
                 </button>
@@ -1208,10 +1207,13 @@ function renderStudyModal(deck) {
         // Attach explain button event listener
         const explainBtn = document.getElementById('explain-btn');
         if (explainBtn) {
-            explainBtn.onclick = () => {
+            // Remove any existing listeners to prevent duplicates
+            explainBtn.replaceWith(explainBtn.cloneNode(true));
+            const newExplainBtn = document.getElementById('explain-btn');
+            newExplainBtn.addEventListener('click', () => {
                 const explanation = card.explanation || 'No explanation available for this card.';
                 alert(explanation);
-            };
+            });
         }
     };
 
@@ -1237,16 +1239,6 @@ function renderStudyModal(deck) {
             updateCardDisplay();
         }
     });
-
-    // Initial explain button event listener
-    const explainBtn = document.getElementById('explain-btn');
-    if (explainBtn) {
-        explainBtn.addEventListener('click', () => {
-            const card = cards[currentCardIndex];
-            const explanation = card.explanation || 'No explanation available for this card.';
-            alert(explanation);
-        });
-    }
 }
 
 // --- Single Deck View (Unchanged) ---
@@ -3809,6 +3801,7 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
+
 
 
 
