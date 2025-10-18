@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -1107,6 +1108,79 @@
                 }
             }));
         }
+
+async function renderSingleDeckView(deckId) {
+    try {
+        const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+        const deckSnap = await getDoc(deckRef);
+        if (!deckSnap.exists()) {
+            console.error("Deck not found");
+            renderDecksView(allUserDecks);
+            return;
+        }
+        const deck = { id: deckSnap.id, ...deckSnap.data() };
+        const cards = deck.cards || [];
+        setHeader(deck.topic);
+        
+        const content = document.getElementById('app-content');
+        content.innerHTML = `
+            <div class="flex flex-col space-y-4">
+               <div class="flex items-center justify-between">
+                   <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
+                       <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                       Back to My Decks
+                   </button>
+                   <div class="flex space-x-2">
+                       <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Card</button>
+                       <button id="start-study-btn" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700" ${cards.length === 0 ? 'disabled' : ''}>Study</button>
+                       <button id="start-quiz-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" ${cards.length === 0 ? 'disabled' : ''}>AI Quiz</button>
+                   </div>
+               </div>
+                <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                    <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                        ${cards.length > 0 ? cards.map((card, index) => `
+                            <li class="p-4 flex items-center justify-between">
+                                <div class="flex-1 mr-4 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
+                                </div>
+                                <div class="flex items-center flex-shrink-0">
+                                    <button class="edit-card-btn text-gray-400 hover:text-blue-500 mr-2" data-index="${index}">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                                    </button>
+                                    <button class="delete-card-btn text-gray-400 hover:text-red-500" data-index="${index}">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            </li>
+                        `).join('') : `<li class="p-6 text-center text-gray-500">No cards in this deck yet.</li>`}
+                    </ul>
+                </div>
+            </div>`;
+
+        document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
+        document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
+        
+        // Add listeners for BOTH buttons
+        document.getElementById('start-study-btn').addEventListener('click', () => renderQuizModal(deck));
+        document.getElementById('start-quiz-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
+        
+        document.querySelectorAll('.edit-card-btn').forEach(btn => {
+            const cardIndex = parseInt(btn.dataset.index);
+            const cardToEdit = cards[cardIndex];
+            btn.addEventListener('click', () => {
+                renderEditCardModal(deckId, cardIndex, cardToEdit);
+            });
+        });
+
+        document.querySelectorAll('.delete-card-btn').forEach(btn => btn.addEventListener('click', () => {
+            deleteCard(deckId, parseInt(btn.dataset.index));
+        }));
+    } catch (error) {
+        console.error("Error fetching single deck:", error);
+    }
+}
+
         
         function renderSubjectsTrackerView() {
     const progressContent = document.getElementById('progress-content');
@@ -3744,4 +3818,3 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
-
