@@ -986,32 +986,52 @@
         }
         
         function renderLibrary(decks, searchTerm = '') {
-            const libraryList = document.getElementById('library-list');
-            if (!libraryList) return;
+    const libraryList = document.getElementById('library-list');
+    if (!libraryList) return;
 
-            const sortedDecks = decks.sort((a, b) => a.topic.localeCompare(b.topic));
-            
-             const decksHTML = sortedDecks.map(deck => {
-                let topicHTML;
-                const escapedTopic = deck.topic.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const sortedDecks = decks.sort((a, b) => a.topic.localeCompare(b.topic));
 
-                if (!searchTerm.trim()) {
-                    topicHTML = `<span>${escapedTopic}</span>`;
-                } else {
-                    const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
-                    topicHTML = escapedTopic.replace(regex, `<strong class="font-bold">$1</strong>`);
-                }
-                
-                return `
-                <a href="#" class="flex items-center px-2 py-1 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" data-id="${deck.id}">
-                >&nbsp;${topicHTML}
-                </a>
-                `;
-            }).join('');
+    const decksHTML = sortedDecks.map(deck => {
+        const escapedTopic = deck.topic.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        let topicHTML;
 
-            libraryList.innerHTML = decksHTML;
-        }
+        if (!searchTerm.trim()) {
+    topicHTML = escapedTopic.replace(/ /g, '&nbsp;');
+} else {
+    let resultHTML = '';
+    let lastIndex = 0;
+    const lowerCaseTopic = escapedTopic.toLowerCase();
+    const lowerCaseSearch = searchTerm.toLowerCase();
+
+    let startIndex = lowerCaseTopic.indexOf(lowerCaseSearch);
+
+    while (startIndex !== -1) {
+        // Preserve spaces before the match
+        resultHTML += escapedTopic
+            .substring(lastIndex, startIndex)
+            .replace(/ /g, '&nbsp;');
+
+        // Highlighted part
+        resultHTML += `<strong class="font-bold">${escapedTopic.substring(startIndex, startIndex + searchTerm.length)}</strong>`;
+
+        lastIndex = startIndex + searchTerm.length;
+        startIndex = lowerCaseTopic.indexOf(lowerCaseSearch, lastIndex);
+    }
+
+    // Preserve spaces after last match
+    resultHTML += escapedTopic.substring(lastIndex).replace(/ /g, '&nbsp;');
+    topicHTML = resultHTML;
+}  
+        return `
+        <a href="#" class="flex items-center px-2 py-1 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg" data-id="${deck.id}">
+            ${topicHTML}
+        </a>
+        `;
+    }).join('');
+
+    libraryList.innerHTML = decksHTML;
+}
+
 
         function renderDecksView(decks) {
             setActiveNav('nav-my-decks');
