@@ -1124,7 +1124,7 @@
             }));
         }
         
-        // --- Study Mode Modal ---
+// --- Study Mode Modal ---
 // --- Study Mode Modal ---
 function renderStudyModal(deck) {
     const cards = deck.cards || [];
@@ -1139,7 +1139,7 @@ function renderStudyModal(deck) {
     const renderCardContent = () => {
         const card = cards[currentCardIndex];
         return `
-            <div class="scene w-full h-64 cursor-pointer" id="study-card">
+            <div class="scene w-full h-64" id="study-card">
                 <div class="card ${isFlipped ? 'is-flipped' : ''} w-full h-full relative">
                     <div class="card-face absolute w-full h-full bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center justify-center p-4">
                         <p class="text-lg text-gray-900 dark:text-white text-center">${card.question}</p>
@@ -1170,7 +1170,7 @@ function renderStudyModal(deck) {
                     Next
                 </button>
             </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 text-center mt-2">Card ${currentCardIndex + 1} of ${cards.length}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center mt-2" id="card-counter">Card ${currentCardIndex + 1} of ${cards.length}</p>
         </div>
     `;
 
@@ -1181,8 +1181,21 @@ function renderStudyModal(deck) {
     modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
 
     const updateCardDisplay = () => {
-        const cardContent = document.getElementById('study-card-content');
-        cardContent.innerHTML = renderCardContent();
+        const cardElement = document.querySelector('#study-card .card');
+        const questionElement = cardElement.querySelector('.card-face:not(.card-face-back) p');
+        const answerElement = cardElement.querySelector('.card-face-back p');
+        const explainBtnContainer = document.getElementById('explain-btn-container');
+        const cardCounter = document.getElementById('card-counter');
+        const card = cards[currentCardIndex];
+
+        // Update content without replacing the card structure
+        questionElement.textContent = card.question;
+        answerElement.textContent = card.answer;
+        cardElement.classList.toggle('is-flipped', isFlipped);
+        explainBtnContainer.classList.toggle('hidden', !isFlipped);
+        cardCounter.textContent = `Card ${currentCardIndex + 1} of ${cards.length}`;
+
+        // Update button states
         const prevBtn = document.getElementById('study-prev-btn');
         const nextBtn = document.getElementById('study-next-btn');
         prevBtn.disabled = currentCardIndex === 0;
@@ -1191,28 +1204,20 @@ function renderStudyModal(deck) {
         nextBtn.disabled = currentCardIndex === cards.length - 1;
         nextBtn.classList.toggle('opacity-50', currentCardIndex === cards.length - 1);
         nextBtn.classList.toggle('cursor-not-allowed', currentCardIndex === cards.length - 1);
-        document.querySelector('.text-center.mt-2').textContent = `Card ${currentCardIndex + 1} of ${cards.length}`;
 
-        // Re-attach card click event listener
-        const card = document.getElementById('study-card');
-        card.addEventListener('click', () => {
-            isFlipped = !isFlipped;
-            updateCardDisplay();
-        });
-
-        // Attach explain button event listener if visible
+        // Attach explain button event listener
         const explainBtn = document.getElementById('explain-btn');
         if (explainBtn) {
-            explainBtn.addEventListener('click', () => {
-                const card = cards[currentCardIndex];
+            explainBtn.onclick = () => {
                 const explanation = card.explanation || 'No explanation available for this card.';
                 alert(explanation);
-            });
+            };
         }
     };
 
-    // Initial card click event listener
-    document.getElementById('study-card').addEventListener('click', () => {
+    // Attach click event listener to the card
+    const cardElement = document.querySelector('#study-card .card');
+    cardElement.addEventListener('click', () => {
         isFlipped = !isFlipped;
         updateCardDisplay();
     });
@@ -3804,5 +3809,6 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
+
 
 
