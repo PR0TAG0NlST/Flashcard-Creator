@@ -1124,7 +1124,61 @@
             }));
         }
         
-// --- Study Mode Modal ---
+// --- New: Gemini Explanation Generation ---
+async function generateExplanation(question, answer) {
+    const prompt = `Explain this flashcard in simple terms for a student: Question: ${question} Answer: ${answer}`;
+    
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: prompt
+                    }]
+                }]
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No explanation generated.';
+        return generatedText.trim();
+    } catch (error) {
+        console.error('Error generating explanation:', error);
+        return 'Sorry, could not generate an explanation right now. Please try again later.';
+    }
+}
+
+function renderExplanationModal(explanation, question, answer) {
+    const modalContent = `
+        <div class="space-y-4">
+            <h4 class="text-md font-semibold text-gray-900 dark:text-white">Explanation</h4>
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <p class="text-sm text-gray-700 dark:text-gray-300">${explanation}</p>
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                <p><strong>Question:</strong> ${question}</p>
+                <p><strong>Answer:</strong> ${answer}</p>
+            </div>
+        </div>
+    `;
+
+    renderModal('explanation-modal', 'Detailed Explanation', modalContent, () => {}, '');
+    const modal = document.getElementById('explanation-modal');
+    modal.querySelector('#modal-save-btn').style.display = 'none';
+    modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
+}
+
+// --- Updated Study Mode Modal ---
 function renderStudyModal(deck) {
     const cards = deck.cards || [];
     if (cards.length === 0) {
@@ -1138,13 +1192,13 @@ function renderStudyModal(deck) {
     const renderCardContent = () => {
         const card = cards[currentCardIndex];
         return `
-            <div class="scene w-full h-64" id="study-card">
+            <div class="scene w-full h-64 cursor-pointer" id="study-card-container">
                 <div class="card ${isFlipped ? 'is-flipped' : ''} w-full h-full relative">
                     <div class="card-face absolute w-full h-full bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center justify-center p-4">
-                        <p class="text-lg text-gray-900 dark:text-white text-center">${card.question}</p>
+                        <p class="text-lg text-gray-900 dark:text-white text-center" id="question-text">${card.question}</p>
                     </div>
                     <div class="card-face card-face-back absolute w-full h-full bg-white dark:bg-gray-800 rounded-lg shadow-md flex items-center justify-center p-4">
-                        <p class="text-lg text-gray-900 dark:text-white text-center">${card.answer}</p>
+                        <p class="text-lg text-gray-900 dark:text-white text-center" id="answer-text">${card.answer}</p>
                     </div>
                 </div>
             </div>
@@ -1180,16 +1234,18 @@ function renderStudyModal(deck) {
     modal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none';
 
     const updateCardDisplay = () => {
-        const cardElement = document.querySelector('#study-card .card');
-        const questionElement = cardElement.querySelector('.card-face:not(.card-face-back) p');
-        const answerElement = cardElement.querySelector('.card-face-back p');
+        const card = cards[currentCardIndex];
+        const questionElement = document.getElementById('question-text');
+        const answerElement = document.getElementById('answer-text');
         const explainBtnContainer = document.getElementById('explain-btn-container');
         const cardCounter = document.getElementById('card-counter');
-        const card = cards[currentCardIndex];
+        const cardElement = document.querySelector('#study-card-container .card');
 
-        // Update content without replacing the card structure
-        questionElement.textContent = card.question;
-        answerElement.textContent = card.answer;
+        if (questionElement && answerElement) {
+            questionElement.textContent = card.question;
+            answerElement.textContent = card.answer;
+        }
+
         cardElement.classList.toggle('is-flipped', isFlipped);
         explainBtnContainer.classList.toggle('hidden', !isFlipped);
         cardCounter.textContent = `Card ${currentCardIndex + 1} of ${cards.length}`;
@@ -1204,22 +1260,25 @@ function renderStudyModal(deck) {
         nextBtn.classList.toggle('opacity-50', currentCardIndex === cards.length - 1);
         nextBtn.classList.toggle('cursor-not-allowed', currentCardIndex === cards.length - 1);
 
-        // Attach explain button event listener
+        // Attach explain button event listener (single attachment per update)
         const explainBtn = document.getElementById('explain-btn');
-        if (explainBtn) {
-            // Remove any existing listeners to prevent duplicates
-            explainBtn.replaceWith(explainBtn.cloneNode(true));
-            const newExplainBtn = document.getElementById('explain-btn');
-            newExplainBtn.addEventListener('click', () => {
-                const explanation = card.explanation || 'No explanation available for this card.';
-                alert(explanation);
+        if (explainBtn && isFlipped) {
+            explainBtn.onclick = null; // Clear any existing handler
+            explainBtn.addEventListener('click', async () => {
+                explainBtn.disabled = true;
+                explainBtn.textContent = 'Generating...';
+                const explanation = await generateExplanation(card.question, card.answer);
+                renderExplanationModal(explanation, card.question, card.answer);
+                explainBtn.disabled = false;
+                explainBtn.textContent = 'Explain';
             });
         }
     };
 
-    // Attach click event listener to the card
-    const cardElement = document.querySelector('#study-card .card');
-    cardElement.addEventListener('click', () => {
+    // Initial card click event listener
+    const cardContainer = document.getElementById('study-card-container');
+    cardContainer.addEventListener('click', (e) => {
+        if (e.target.closest('#explain-btn-container')) return; // Prevent flip if clicking Explain
         isFlipped = !isFlipped;
         updateCardDisplay();
     });
@@ -1239,9 +1298,12 @@ function renderStudyModal(deck) {
             updateCardDisplay();
         }
     });
+
+    // Initial display
+    updateCardDisplay();
 }
 
-// --- Single Deck View (Unchanged) ---
+// --- Single Deck View (Unchanged from previous) ---
 function renderSingleDeckView(deckId) {
     setHeader('My Decks');
     const content = document.getElementById('app-content');
@@ -1325,7 +1387,6 @@ function renderSingleDeckView(deckId) {
         });
     });
 }
-
         function renderProgressView() {
             setActiveNav('nav-progress');
             setHeader('Progress Tracker');
@@ -3801,6 +3862,7 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
+
 
 
 
