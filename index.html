@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -1650,75 +1651,63 @@ async function renderQuizResultsView(score, totalQuestions, deck, userAnswers) {
             });
         }
 
-// --- NEW ---
-// This view shows the list of decks with quiz results
+// --- MODIFIED ---
+// This view now reads quiz data from the `allUserDecks` array
 async function renderDeckPerformanceView() {
     const progressContent = document.getElementById('progress-content');
     if (!progressContent) return;
 
-    progressContent.innerHTML = `<div class="text-center text-gray-500">Loading deck performance...</div>`;
+    // Filter decks that have quiz results
+    const decksWithResults = allUserDecks.filter(deck => deck.quizResults && deck.quizResults.length > 0);
 
-    try {
-        const q = query(collection(db, `/artifacts/${appId}/users/${userId}/quiz_results`));
-        const snapshot = await getDocs(q);
-        const results = snapshot.docs.map(doc => doc.data());
-
-        if (results.length === 0) {
-            progressContent.innerHTML = `
-                <div class="text-center py-12">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Quiz Data</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Take an AI-generated quiz to see your performance over time.</p>
-                </div>`;
-            return;
-        }
-
-        const decks = results.reduce((acc, result) => {
-            if (!acc[result.deckId]) {
-                acc[result.deckId] = {
-                    deckId: result.deckId,
-                    deckTopic: result.deckTopic,
-                    results: []
-                };
-            }
-            acc[result.deckId].results.push(result);
-            return acc;
-        }, {});
-
-        const decksHTML = Object.values(decks).map(deck => {
-            const latestResult = deck.results.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate())[0];
-            return `
-                <div class="deck-performance-card bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer transition-transform transform hover:-translate-y-1" data-deck-id="${deck.deckId}" data-deck-topic="${deck.deckTopic}">
-                    <h3 class="font-semibold text-lg">${deck.deckTopic}</h3>
-                    <p class="text-sm text-gray-500">Latest Score: ${latestResult.percentage}%</p>
-                    <p class="text-xs text-gray-400 mt-2">${deck.results.length} attempt(s)</p>
-                </div>
-            `;
-        }).join('');
-
-        progressContent.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">${decksHTML}</div>`;
-
-        progressContent.querySelectorAll('.deck-performance-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                const deckId = e.currentTarget.dataset.deckId;
-                const deckTopic = e.currentTarget.dataset.deckTopic;
-                renderDeckPerformanceChart(deckId, deckTopic);
-            });
-        });
-
-    } catch (error) {
-        console.error("Error fetching deck performance:", error);
-        progressContent.innerHTML = `<div class="text-center text-red-500">Failed to load deck performance.</div>`;
+    if (decksWithResults.length === 0) {
+        progressContent.innerHTML = `
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Quiz Data</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Take an AI-generated quiz to see your performance over time.</p>
+            </div>`;
+        return;
     }
+
+    const decksHTML = decksWithResults.map(deck => {
+        // Find the most recent result for display
+        const latestResult = [...deck.quizResults].sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate())[0];
+        return `
+            <div class="deck-performance-card bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer transition-transform transform hover:-translate-y-1" data-deck-id="${deck.id}" data-deck-topic="${deck.topic}">
+                <h3 class="font-semibold text-lg">${deck.topic}</h3>
+                <p class="text-sm text-gray-500">Latest Score: ${latestResult.percentage}%</p>
+                <p class="text-xs text-gray-400 mt-2">${deck.quizResults.length} attempt(s)</p>
+            </div>
+        `;
+    }).join('');
+
+    progressContent.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">${decksHTML}</div>`;
+
+    progressContent.querySelectorAll('.deck-performance-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            const deckId = e.currentTarget.dataset.deckId;
+            const deckTopic = e.currentTarget.dataset.deckTopic;
+            renderDeckPerformanceChart(deckId, deckTopic);
+        });
+    });
 }
 
-// --- NEW ---
-// This view shows the line chart for a specific deck
+
+// --- MODIFIED ---
+// This view now gets chart data from the specific deck object
 async function renderDeckPerformanceChart(deckId, deckTopic) {
     const progressContent = document.getElementById('progress-content');
     if (!progressContent) return;
     
     setHeader(`Performance: ${deckTopic}`);
+
+    const deck = allUserDecks.find(d => d.id === deckId);
+
+    if (!deck || !deck.quizResults) {
+        progressContent.innerHTML = `<div class="text-center text-red-500">Could not find quiz data for this deck.</div>`;
+        return;
+    }
 
     progressContent.innerHTML = `
         <div class="flex items-center mb-4">
@@ -1736,86 +1725,87 @@ async function renderDeckPerformanceChart(deckId, deckTopic) {
 
     document.getElementById('back-to-deck-performance').addEventListener('click', renderDeckPerformanceView);
 
-    try {
-        const q = query(
-            collection(db, `/artifacts/${appId}/users/${userId}/quiz_results`), 
-            where("deckId", "==", deckId)
-        );
-        const snapshot = await getDocs(q);
-        let results = snapshot.docs.map(doc => doc.data());
+    // Sort results by timestamp ascending
+    const results = [...deck.quizResults].sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
 
-        // Sort results by timestamp ascending
-        results.sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
+    const labels = results.map(r => r.timestamp.toDate().toLocaleDateString());
+    const data = results.map(r => r.percentage);
+    
+    const ctx = document.getElementById('deck-performance-chart');
+    if (progressChartInstance) {
+        progressChartInstance.destroy();
+    }
 
-        const labels = results.map(r => r.timestamp.toDate().toLocaleDateString());
-        const data = results.map(r => r.percentage);
-        
-        const ctx = document.getElementById('deck-performance-chart');
-        if (progressChartInstance) {
-            progressChartInstance.destroy();
-        }
-
-        progressChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Quiz Score (%)',
-                    data: data,
-                    fill: false,
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%'
-                            }
+    progressChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Quiz Score (%)',
+                data: data,
+                fill: false,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%'
                         }
                     }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
                 }
             }
-        });
-
-    } catch (error) {
-        console.error("Error rendering deck performance chart:", error);
-        progressContent.innerHTML = `<div class="text-center text-red-500">Could not load chart data.</div>`;
-    }
+        }
+    });
 }
 
 
-// --- NEW ---
-// This function saves a completed quiz result to Firestore
+
+// --- MODIFIED ---
+// This function saves a completed quiz result into the deck document itself
 async function saveQuizResult(deckId, deckTopic, score, totalQuestions) {
     if (!userId) return;
+    const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
     try {
-        const quizResultsCol = collection(db, `/artifacts/${appId}/users/${userId}/quiz_results`);
-        await addDoc(quizResultsCol, {
-            deckId: deckId,
-            deckTopic: deckTopic,
-            score: score,
-            totalQuestions: totalQuestions,
-            percentage: totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0,
-            timestamp: new Date()
+        await runTransaction(db, async (transaction) => {
+            const deckDoc = await transaction.get(deckRef);
+            if (!deckDoc.exists()) {
+                throw "Deck does not exist!";
+            }
+            const data = deckDoc.data();
+            // Get existing results or create a new array
+            const results = data.quizResults || []; 
+            
+            // Add the new result
+            results.push({
+                score: score,
+                totalQuestions: totalQuestions,
+                percentage: totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0,
+                timestamp: new Date() // Use JS Date, Firestore will convert it
+            });
+
+            // Update the document in the transaction
+            transaction.update(deckRef, { quizResults: results });
         });
-        console.log("Quiz result saved successfully.");
+        console.log("Quiz result saved successfully inside the deck.");
     } catch (error) {
         console.error("Error saving quiz result:", error);
     }
 }
+
 
 
 async function generateQuizWithAI(deck) {
