@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -1110,65 +1109,74 @@
         }
         
         async function renderSingleDeckView(deckId) {
-            try {
-                const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
-                const deckSnap = await getDoc(deckRef);
-                if (!deckSnap.exists()) {
-                    console.error("Deck not found");
-                    renderDecksView(allUserDecks);
-                    return;
-                }
-                const deck = { id: deckSnap.id, ...deckSnap.data() };
-                const cards = deck.cards || [];
-                setHeader(deck.topic);
-                
-                const content = document.getElementById('app-content');
-                content.innerHTML = `
-                    <div class="flex flex-col space-y-4">
-                       <div class="flex items-center justify-between">
-                           <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
-                               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                               Back to My Decks
-                           </button>
-                           <div class="flex space-x-2">
-                               <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Card</button>
-                               <button id="start-quiz-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" ${cards.length === 0 ? 'disabled' : ''}>Start Quiz</button>
-                           </div>
-                       </div>
-                        <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
-                            <ul class="divide-y divide-gray-200 dark:divide-gray-700">
-                                ${cards.length > 0 ? cards.map((card, index) => `
-                                    <li class="p-4 flex items-center justify-between">
-                                        <div class="flex-1 mr-4 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
-                                        </div>
-                                        <div class="flex items-center flex-shrink-0">
-                                            <button class="edit-card-btn text-gray-400 hover:text-blue-500 mr-2" data-index="${index}">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
-                                            </button>
-                                            <button class="delete-card-btn text-gray-400 hover:text-red-500" data-index="${index}">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                            </button>
-                                        </div>
-                                    </li>
-                                `).join('') : `<li class="p-6 text-center text-gray-500">No cards in this deck yet.</li>`}
-                            </ul>
-                        </div>
-                    </div>`;
-
-                document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
-                document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
-                
-                // --- THIS LINE IS THE FIX ---
-                document.getElementById('start-quiz-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
-                
-                document.querySelectorAll('.edit-card-btn').forEach(btn => { /* ... */ });
-                document.querySelectorAll('.delete-card-btn').forEach(btn => { /* ... */ });
-            } catch (error) {
-                console.error("Error fetching single deck:", error);
-            }
+    try {
+        const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
+        const deckSnap = await getDoc(deckRef);
+        if (!deckSnap.exists()) {
+            console.error("Deck not found");
+            renderDecksView(allUserDecks);
+            return;
         }
+        const deck = { id: deckSnap.id, ...deckSnap.data() };
+        const cards = deck.cards || [];
+        setHeader(deck.topic);
+        
+        const content = document.getElementById('app-content');
+        content.innerHTML = `
+            <div class="flex flex-col space-y-4">
+               <div class="flex items-center justify-between">
+                   <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
+                       <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                       Back to My Decks
+                   </button>
+                   <div class="flex space-x-2">
+                       <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Card</button>
+                       <button id="start-study-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" ${cards.length === 0 ? 'disabled' : ''}>Study</button>
+                   </div>
+               </div>
+                <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                    <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                        ${cards.length > 0 ? cards.map((card, index) => `
+                            <li class="p-4 flex items-center justify-between">
+                                <div class="flex-1 mr-4 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
+                                </div>
+                                <div class="flex items-center flex-shrink-0">
+                                    <button class="edit-card-btn text-gray-400 hover:text-blue-500 mr-2" data-index="${index}">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                                    </button>
+                                    <button class="delete-card-btn text-gray-400 hover:text-red-500" data-index="${index}">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            </li>
+                        `).join('') : `<li class="p-6 text-center text-gray-500">No cards in this deck yet.</li>`}
+                    </ul>
+                </div>
+            </div>`;
+
+        document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
+        document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
+        
+        // This is the updated line:
+        document.getElementById('start-study-btn').addEventListener('click', () => renderQuizModal(deck));
+        
+        document.querySelectorAll('.edit-card-btn').forEach(btn => {
+            const cardIndex = parseInt(btn.dataset.index);
+            const cardToEdit = cards[cardIndex];
+            btn.addEventListener('click', () => {
+                renderEditCardModal(deckId, cardIndex, cardToEdit);
+            });
+        });
+
+        document.querySelectorAll('.delete-card-btn').forEach(btn => btn.addEventListener('click', () => {
+            deleteCard(deckId, parseInt(btn.dataset.index));
+        }));
+    } catch (error) {
+        console.error("Error fetching single deck:", error);
+    }
+}
 
         function renderProgressView() {
             setActiveNav('nav-progress');
@@ -1556,6 +1564,97 @@
                 }
             });
         }
+
+function renderQuizModal(deck) {
+    let currentCardIndex = 0;
+    
+    const modalContent = `
+        <div id="quiz-content" class="h-96 flex flex-col items-center justify-center">
+            <!-- Card will be rendered here -->
+        </div>
+    `;
+
+    renderModal('quiz-modal', `${deck.topic} Study Session`, modalContent, () => {}, '');
+    // Hide default save/cancel buttons for quiz
+    const quizModal = document.getElementById('quiz-modal');
+    quizModal.querySelector('#modal-save-btn').style.display = 'none';
+    quizModal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none'; 
+    
+    function showCard(index) {
+        const quizContent = document.getElementById('quiz-content');
+        if (!deck.cards || index >= deck.cards.length) {
+            quizContent.innerHTML = `<div class="text-center">
+                <h2 class="text-2xl font-bold mb-4">Study Session Complete!</h2>
+                <button id="quiz-close-btn-final" class="px-4 py-2 text-white bg-blue-600 rounded-lg">Close</button>
+            </div>`;
+             document.getElementById('quiz-close-btn-final').addEventListener('click', () => document.getElementById('quiz-modal').remove());
+            return;
+        }
+
+        const cardData = deck.cards[index];
+        quizContent.innerHTML = `
+            <p class="text-sm text-gray-500 mb-2">${index + 1} / ${deck.cards.length}</p>
+            <div class="scene w-full h-64">
+                <div id="quiz-card" class="card relative w-full h-full cursor-pointer">
+                    <div class="card-face absolute w-full h-full flex items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-lg">
+                        <p class="text-xl text-center">${cardData.question}</p>
+                    </div>
+                    <div class="card-face card-face-back absolute w-full h-full flex items-center justify-center p-6 bg-blue-100 dark:bg-blue-900 rounded-lg shadow-lg">
+                         <p class="text-xl text-center font-semibold">${cardData.answer}</p>
+                    </div>
+                </div>
+            </div>
+             <div id="explain-btn-container" class="h-12 mt-4 flex justify-center items-center">
+                <!-- Explain button will be dynamically added here -->
+            </div>
+            <div class="mt-2 flex items-center justify-center space-x-4">
+                <button id="prev-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600" ${index === 0 ? 'disabled' : ''}>Previous</button>
+                <button id="flip-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600">Flip</button>
+                <button id="next-card-btn" class="px-6 py-2 rounded-lg bg-blue-600 text-white">Next</button>
+            </div>
+        `;
+
+        const cardElement = document.getElementById('quiz-card');
+        const explainContainer = document.getElementById('explain-btn-container');
+        
+        function flipCard() {
+            cardElement.classList.toggle('is-flipped');
+             if (cardElement.classList.contains('is-flipped')) {
+                explainContainer.innerHTML = `
+                    <button id="explain-card-btn" class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2V10a2 2 0 012-2h8z"></path></svg>
+                        Explain
+                    </button>`;
+                document.getElementById('explain-card-btn').addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent quiz modal from handling this click
+                    renderChatbotModal(cardData);
+                });
+            } else {
+                explainContainer.innerHTML = '';
+            }
+        }
+
+        cardElement.addEventListener('click', flipCard);
+        document.getElementById('flip-card-btn').addEventListener('click', flipCard);
+        
+        document.getElementById('next-card-btn').addEventListener('click', () => {
+            currentCardIndex++;
+            showCard(currentCardIndex);
+        });
+
+        const prevButton = document.getElementById('prev-card-btn');
+        if(prevButton) {
+            prevButton.addEventListener('click', () => {
+                currentCardIndex--;
+                showCard(currentCardIndex);
+            });
+        }
+    }
+
+    showCard(currentCardIndex);
+}
+
+		
 async function generateQuizWithAI(deck) {
             const cardContent = deck.cards.map(c => `Q: ${c.question}\nA: ${c.answer}`).join('\n\n');
             const questionCount = Math.max(deck.cards.length, 5); // Ensure at least 5 questions
@@ -3592,4 +3691,5 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
+
 
