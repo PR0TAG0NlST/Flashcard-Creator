@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -1108,171 +1109,256 @@
             }));
         }
         
-        async function renderSingleDeckView(deckId) {
-    try {
-        const deckRef = doc(db, `/artifacts/${appId}/users/${userId}/decks`, deckId);
-        const deckSnap = await getDoc(deckRef);
-        if (!deckSnap.exists()) {
-            console.error("Deck not found");
-            renderDecksView(allUserDecks);
-            return;
-        }
-        const deck = { id: deckSnap.id, ...deckSnap.data() };
-        const cards = deck.cards || [];
-        setHeader(deck.topic);
-        
-        const content = document.getElementById('app-content');
-        content.innerHTML = `
-            <div class="flex flex-col space-y-4">
-               <div class="flex items-center justify-between">
-                   <button id="back-to-decks" class="flex items-center text-sm text-blue-600 hover:underline">
-                       <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                       Back to My Decks
-                   </button>
-                   <div class="flex space-x-2">
-                       <button id="add-card-btn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">Add Card</button>
-                       <button id="start-study-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" ${cards.length === 0 ? 'disabled' : ''}>Study</button>
-                   </div>
-               </div>
-                <div id="card-list" class="bg-white dark:bg-gray-800 rounded-lg shadow">
-                    <ul class="divide-y divide-gray-200 dark:divide-gray-700">
-                        ${cards.length > 0 ? cards.map((card, index) => `
-                            <li class="p-4 flex items-center justify-between">
-                                <div class="flex-1 mr-4 min-w-0">
-                                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate"><strong>Q:</strong> ${card.question}</p>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate"><strong>A:</strong> ${card.answer}</p>
-                                </div>
-                                <div class="flex items-center flex-shrink-0">
-                                    <button class="edit-card-btn text-gray-400 hover:text-blue-500 mr-2" data-index="${index}">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
-                                    </button>
-                                    <button class="delete-card-btn text-gray-400 hover:text-red-500" data-index="${index}">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                    </button>
-                                </div>
-                            </li>
-                        `).join('') : `<li class="p-6 text-center text-gray-500">No cards in this deck yet.</li>`}
-                    </ul>
+        function renderSubjectsTrackerView() {
+    const progressContent = document.getElementById('progress-content');
+    if (!progressContent) return;
+
+    progressContent.innerHTML = `
+        <div id="overall-progress-chart-container" class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-8">
+            <h3 class="text-lg font-semibold mb-4">Overall Subject Progress</h3>
+            <div class="h-64">
+                <canvas id="subjects-progress-chart"></canvas>
+            </div>
+        </div>
+        <div class="flex justify-end mb-4">
+            <button id="add-subject-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                Add Subject
+            </button>
+        </div>
+        <div id="subject-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Subject cards will be rendered here -->
+        </div>
+    `;
+    
+    if (progressSubjects.length === 0) {
+         document.getElementById('subject-cards-container').innerHTML = `
+            <div class="col-span-full text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Subjects</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by adding a subject to track.</p>
+                <div class="mt-6">
+                    <button id="add-subject-btn-empty" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                        Add Subject
+                    </button>
                 </div>
             </div>`;
-
-        document.getElementById('back-to-decks').addEventListener('click', () => renderDecksView(allUserDecks));
-        document.getElementById('add-card-btn').addEventListener('click', () => renderAddCardModal(deckId));
-        
-        // This is the updated line:
-        document.getElementById('start-study-btn').addEventListener('click', () => renderQuizModal(deck));
-        
-        document.querySelectorAll('.edit-card-btn').forEach(btn => {
-            const cardIndex = parseInt(btn.dataset.index);
-            const cardToEdit = cards[cardIndex];
-            btn.addEventListener('click', () => {
-                renderEditCardModal(deckId, cardIndex, cardToEdit);
-            });
-        });
-
-        document.querySelectorAll('.delete-card-btn').forEach(btn => btn.addEventListener('click', () => {
-            deleteCard(deckId, parseInt(btn.dataset.index));
-        }));
-    } catch (error) {
-        console.error("Error fetching single deck:", error);
+        document.getElementById('add-subject-btn-empty').addEventListener('click', renderAddSubjectModal);
+        document.getElementById('add-subject-btn').classList.add('hidden');
+        document.getElementById('overall-progress-chart-container').classList.add('hidden');
+        return;
     }
+
+    drawSubjectsProgressBarChart(progressSubjects);
+
+    const subjectCards = progressSubjects.map(subject => {
+        const units = subject.units || [];
+        let totalProgress = 0;
+        if(units.length > 0) {
+            const unitWeight = 100 / units.length;
+            const totalPoints = units.reduce((sum, unit) => {
+                const topics = unit.topics || [];
+                if (topics.length === 0) return sum;
+                const completed = topics.filter(t => t.done).length;
+                return sum + (completed / topics.length) * unitWeight;
+            }, 0);
+            totalProgress = totalPoints;
+        }
+        
+        return `
+        <div class="subject-card bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer" data-id="${subject.id}">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="font-semibold text-lg">${subject.name}</h3>
+                    <p class="text-sm text-gray-500">${Math.round(totalProgress)}% Complete</p>
+                </div>
+                <div class="flex items-center">
+                    <button class="rename-subject-btn text-gray-400 hover:text-blue-500 mr-2" data-id="${subject.id}" data-name="${subject.name}">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
+                    </button>
+                    <button class="delete-subject-btn text-gray-400 hover:text-red-500" data-id="${subject.id}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        `;
+    }).join('');
+    
+    document.getElementById('subject-cards-container').innerHTML = subjectCards;
+
+    document.getElementById('add-subject-btn').addEventListener('click', renderAddSubjectModal);
+    document.querySelectorAll('.subject-card').forEach(card => card.addEventListener('click', e => {
+        if (!e.target.closest('.delete-subject-btn') && !e.target.closest('.rename-subject-btn')) {
+            renderSingleSubjectView(card.dataset.id);
+        }
+    }));
+    document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', e => {
+        e.stopPropagation();
+        deleteProgressSubject(btn.dataset.id);
+    }));
+    document.querySelectorAll('.rename-subject-btn').forEach(btn => btn.addEventListener('click', e => {
+        e.stopPropagation();
+        renderRenameSubjectModal(btn.dataset.id, btn.dataset.name);
+    }));
 }
 
-        function renderProgressView() {
-            setActiveNav('nav-progress');
-            setHeader('Progress Tracker');
-            const content = document.getElementById('app-content');
 
-            content.innerHTML = `
-                <div id="progress-view-container">
-                    <div id="overall-progress-chart-container" class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-8">
-                        <h3 class="text-lg font-semibold mb-4">Overall Subject Progress</h3>
-                        <div class="h-64">
-                            <canvas id="subjects-progress-chart"></canvas>
+
+        // --- MODIFIED ---
+// This now acts as a controller for the different progress views
+function renderProgressView() {
+    setActiveNav('nav-progress');
+    setHeader('Progress Tracker');
+    const content = document.getElementById('app-content');
+
+    content.innerHTML = `
+        <div>
+            <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button id="subjects-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
+                        Subjects
+                    </button>
+                    <button id="decks-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
+                        Deck Performance
+                    </button>
+                </nav>
+            </div>
+            <div id="progress-content">
+                <!-- Content for the selected tab will be rendered here -->
+            </div>
+        </div>
+    `;
+
+    const subjectsTab = document.getElementById('subjects-tab');
+    const decksTab = document.getElementById('decks-tab');
+    const progressContent = document.getElementById('progress-content');
+
+    function activateTab(activeTab) {
+        subjectsTab.classList.remove('text-blue-600', 'border-blue-600');
+        subjectsTab.classList.add('text-gray-500', 'hover:text-gray-700', 'border-transparent');
+        decksTab.classList.remove('text-blue-600', 'border-blue-600');
+        decksTab.classList.add('text-gray-500', 'hover:text-gray-700', 'border-transparent');
+
+        activeTab.classList.add('text-blue-600', 'border-blue-600');
+        activeTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'border-transparent');
+    }
+
+    subjectsTab.addEventListener('click', () => {
+        activateTab(subjectsTab);
+        renderSubjectsTrackerView();
+    });
+
+    decksTab.addEventListener('click', () => {
+        activateTab(decksTab);
+        renderDeckPerformanceView();
+    });
+
+    // Load the default view
+    renderSubjectsTrackerView();
+}
+
+
+// --- MODIFIED ---
+// Now saves the result before showing the view
+async function renderQuizResultsView(score, totalQuestions, deck, userAnswers) {
+    // --- THIS IS THE NEW LINE TO SAVE THE RESULT ---
+    await saveQuizResult(deck.id, deck.topic, score, totalQuestions);
+
+    setHeader(`Quiz Results: ${deck.topic}`);
+    const content = document.getElementById('app-content');
+    const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+    const correctCount = userAnswers.filter(a => a.status === 'correct').length;
+    const incorrectCount = userAnswers.filter(a => a.status === 'incorrect').length;
+    const skippedCount = userAnswers.filter(a => a.status === 'skipped').length;
+
+    let scoreColorClass = 'text-red-500 border-red-500';
+    if (percentage >= 75) {
+        scoreColorClass = 'text-green-500 border-green-500';
+    } else if (percentage >= 50) {
+        scoreColorClass = 'text-yellow-500 border-yellow-500';
+    }
+
+    const reviewHTML = userAnswers.map((answer, index) => {
+        const questionNumber = index + 1;
+        let statusIcon = '';
+        if (answer.status === 'correct') {
+            statusIcon = `<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+        } else if (answer.status === 'incorrect') {
+            statusIcon = `<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>`;
+        } else {
+            statusIcon = `<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>`;
+        }
+
+        return `
+            <div class="py-4 border-b dark:border-gray-700">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 mr-3">${statusIcon}</div>
+                    <div class="flex-1">
+                        <p class="mb-4">${questionNumber}. ${answer.question}</p>
+                        <div class="space-y-2">
+                            ${answer.options.map(option => {
+                                let optionClass = 'border-gray-300 dark:border-gray-600';
+                                if (option === answer.correctAnswer) {
+                                    optionClass = 'border-green-500 bg-green-50 dark:bg-green-900/50 text-green-800 dark:text-green-300 font-bold';
+                                }
+                                if (answer.status === 'incorrect' && option === answer.userAnswer) {
+                                    optionClass = 'border-red-500 bg-red-50 dark:bg-red-900/50 text-red-800 dark:text-red-300';
+                                }
+                                return `<div class="p-3 border rounded-md ${optionClass}">${option}</div>`;
+                            }).join('')}
                         </div>
-                    </div>
-                    <div class="flex justify-end mb-4">
-                        <button id="add-subject-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                            Add Subject
-                        </button>
-                    </div>
-                    <div id="subject-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- Subject cards will be rendered here -->
+                        ${answer.status === 'skipped' ? '<p class="text-sm text-yellow-500 mt-2">You skipped this question.</p>' : ''}
                     </div>
                 </div>
-            `;
-            
-            if (progressSubjects.length === 0) {
-                 document.getElementById('subject-cards-container').innerHTML = `
-                    <div class="col-span-full text-center py-12">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Subjects</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by adding a subject to track.</p>
-                        <div class="mt-6">
-                            <button id="add-subject-btn-empty" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                Add Subject
-                            </button>
+            </div>
+        `;
+    }).join('');
+
+    content.innerHTML = `
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-bold mb-4">Don't give up now! Trust the process.</h2>
+                <div class="flex justify-center items-center space-x-12">
+                    <div class="flex flex-col items-center">
+                        <div class="w-32 h-32 flex items-center justify-center border-4 ${scoreColorClass} rounded-full mb-2">
+                            <span class="text-4xl font-bold ${scoreColorClass}">${percentage}%</span>
                         </div>
-                    </div>`;
-                document.getElementById('add-subject-btn-empty').addEventListener('click', renderAddSubjectModal);
-                document.getElementById('add-subject-btn').classList.add('hidden');
-                document.getElementById('overall-progress-chart-container').classList.add('hidden');
-                return;
-            }
-
-            drawSubjectsProgressBarChart(progressSubjects);
-
-            const subjectCards = progressSubjects.map(subject => {
-                const units = subject.units || [];
-                let totalProgress = 0;
-                if(units.length > 0) {
-                    const unitWeight = 100 / units.length;
-                    const totalPoints = units.reduce((sum, unit) => {
-                        const topics = unit.topics || [];
-                        if (topics.length === 0) return sum;
-                        const completed = topics.filter(t => t.done).length;
-                        return sum + (completed / topics.length) * unitWeight;
-                    }, 0);
-                    totalProgress = totalPoints;
-                }
-                
-                return `
-                <div class="subject-card bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer" data-id="${subject.id}">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h3 class="font-semibold text-lg">${subject.name}</h3>
-                            <p class="text-sm text-gray-500">${Math.round(totalProgress)}% Complete</p>
+                        <span class="font-semibold text-lg">Score</span>
+                    </div>
+                    <div class="text-left space-y-4">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                            <span><strong class="text-gray-900 dark:text-white">${correctCount}</strong> Correct</span>
                         </div>
                         <div class="flex items-center">
-                            <button class="rename-subject-btn text-gray-400 hover:text-blue-500 mr-2" data-id="${subject.id}" data-name="${subject.name}">
-                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z"></path></svg>
-                            </button>
-                            <button class="delete-subject-btn text-gray-400 hover:text-red-500" data-id="${subject.id}">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
+                            <svg class="w-6 h-6 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+                            <span><strong class="text-gray-900 dark:text-white">${incorrectCount}</strong> Incorrect</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                            <span><strong class="text-gray-900 dark:text-white">${skippedCount}</strong> Skipped</span>
                         </div>
                     </div>
                 </div>
-                `;
-            }).join('');
+            </div>
             
-            document.getElementById('subject-cards-container').innerHTML = subjectCards;
+            <div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-4">Review your answers</h3>
+                <div id="quiz-review-list">
+                    ${reviewHTML}
+                </div>
+            </div>
+            
+            <div class="mt-8 flex justify-center space-x-4">
+                <button id="quiz-again-btn" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Try Again</button>
+                <button id="quiz-decks-btn" class="px-8 py-3 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 font-semibold">Back to Decks</button>
+            </div>
+        </div>
+    `;
 
-            document.getElementById('add-subject-btn').addEventListener('click', renderAddSubjectModal);
-            document.querySelectorAll('.subject-card').forEach(card => card.addEventListener('click', e => {
-                if (!e.target.closest('.delete-subject-btn') && !e.target.closest('.rename-subject-btn')) {
-                    renderSingleSubjectView(card.dataset.id);
-                }
-            }));
-            document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', e => {
-                e.stopPropagation();
-                deleteProgressSubject(btn.dataset.id);
-            }));
-            document.querySelectorAll('.rename-subject-btn').forEach(btn => btn.addEventListener('click', e => {
-                e.stopPropagation();
-                renderRenameSubjectModal(btn.dataset.id, btn.dataset.name);
-            }));
-        }
+    document.getElementById('quiz-again-btn').addEventListener('click', () => startAIGeneratedQuiz(deck));
+    document.getElementById('quiz-decks-btn').addEventListener('click', () => renderDecksView(allUserDecks));
+}
 
         function renderSingleSubjectView(subjectId) {
             const subject = progressSubjects.find(s => s.id === subjectId);
@@ -1565,96 +1651,174 @@
             });
         }
 
-function renderQuizModal(deck) {
-    let currentCardIndex = 0;
-    
-    const modalContent = `
-        <div id="quiz-content" class="h-96 flex flex-col items-center justify-center">
-            <!-- Card will be rendered here -->
-        </div>
-    `;
+// --- NEW ---
+// This view shows the list of decks with quiz results
+async function renderDeckPerformanceView() {
+    const progressContent = document.getElementById('progress-content');
+    if (!progressContent) return;
 
-    renderModal('quiz-modal', `${deck.topic} Study Session`, modalContent, () => {}, '');
-    // Hide default save/cancel buttons for quiz
-    const quizModal = document.getElementById('quiz-modal');
-    quizModal.querySelector('#modal-save-btn').style.display = 'none';
-    quizModal.querySelector('.modal-close-btn:not(h3 ~ .modal-close-btn)').style.display = 'none'; 
-    
-    function showCard(index) {
-        const quizContent = document.getElementById('quiz-content');
-        if (!deck.cards || index >= deck.cards.length) {
-            quizContent.innerHTML = `<div class="text-center">
-                <h2 class="text-2xl font-bold mb-4">Study Session Complete!</h2>
-                <button id="quiz-close-btn-final" class="px-4 py-2 text-white bg-blue-600 rounded-lg">Close</button>
-            </div>`;
-             document.getElementById('quiz-close-btn-final').addEventListener('click', () => document.getElementById('quiz-modal').remove());
+    progressContent.innerHTML = `<div class="text-center text-gray-500">Loading deck performance...</div>`;
+
+    try {
+        const q = query(collection(db, `/artifacts/${appId}/users/${userId}/quiz_results`));
+        const snapshot = await getDocs(q);
+        const results = snapshot.docs.map(doc => doc.data());
+
+        if (results.length === 0) {
+            progressContent.innerHTML = `
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Quiz Data</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Take an AI-generated quiz to see your performance over time.</p>
+                </div>`;
             return;
         }
 
-        const cardData = deck.cards[index];
-        quizContent.innerHTML = `
-            <p class="text-sm text-gray-500 mb-2">${index + 1} / ${deck.cards.length}</p>
-            <div class="scene w-full h-64">
-                <div id="quiz-card" class="card relative w-full h-full cursor-pointer">
-                    <div class="card-face absolute w-full h-full flex items-center justify-center p-6 bg-white dark:bg-gray-700 rounded-lg shadow-lg">
-                        <p class="text-xl text-center">${cardData.question}</p>
-                    </div>
-                    <div class="card-face card-face-back absolute w-full h-full flex items-center justify-center p-6 bg-blue-100 dark:bg-blue-900 rounded-lg shadow-lg">
-                         <p class="text-xl text-center font-semibold">${cardData.answer}</p>
-                    </div>
-                </div>
-            </div>
-             <div id="explain-btn-container" class="h-12 mt-4 flex justify-center items-center">
-                <!-- Explain button will be dynamically added here -->
-            </div>
-            <div class="mt-2 flex items-center justify-center space-x-4">
-                <button id="prev-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600" ${index === 0 ? 'disabled' : ''}>Previous</button>
-                <button id="flip-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600">Flip</button>
-                <button id="next-card-btn" class="px-6 py-2 rounded-lg bg-blue-600 text-white">Next</button>
-            </div>
-        `;
-
-        const cardElement = document.getElementById('quiz-card');
-        const explainContainer = document.getElementById('explain-btn-container');
-        
-        function flipCard() {
-            cardElement.classList.toggle('is-flipped');
-             if (cardElement.classList.contains('is-flipped')) {
-                explainContainer.innerHTML = `
-                    <button id="explain-card-btn" class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 flex items-center">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2V10a2 2 0 012-2h8z"></path></svg>
-                        Explain
-                    </button>`;
-                document.getElementById('explain-card-btn').addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent quiz modal from handling this click
-                    renderChatbotModal(cardData);
-                });
-            } else {
-                explainContainer.innerHTML = '';
+        const decks = results.reduce((acc, result) => {
+            if (!acc[result.deckId]) {
+                acc[result.deckId] = {
+                    deckId: result.deckId,
+                    deckTopic: result.deckTopic,
+                    results: []
+                };
             }
-        }
+            acc[result.deckId].results.push(result);
+            return acc;
+        }, {});
 
-        cardElement.addEventListener('click', flipCard);
-        document.getElementById('flip-card-btn').addEventListener('click', flipCard);
-        
-        document.getElementById('next-card-btn').addEventListener('click', () => {
-            currentCardIndex++;
-            showCard(currentCardIndex);
+        const decksHTML = Object.values(decks).map(deck => {
+            const latestResult = deck.results.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate())[0];
+            return `
+                <div class="deck-performance-card bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer transition-transform transform hover:-translate-y-1" data-deck-id="${deck.deckId}" data-deck-topic="${deck.deckTopic}">
+                    <h3 class="font-semibold text-lg">${deck.deckTopic}</h3>
+                    <p class="text-sm text-gray-500">Latest Score: ${latestResult.percentage}%</p>
+                    <p class="text-xs text-gray-400 mt-2">${deck.results.length} attempt(s)</p>
+                </div>
+            `;
+        }).join('');
+
+        progressContent.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">${decksHTML}</div>`;
+
+        progressContent.querySelectorAll('.deck-performance-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const deckId = e.currentTarget.dataset.deckId;
+                const deckTopic = e.currentTarget.dataset.deckTopic;
+                renderDeckPerformanceChart(deckId, deckTopic);
+            });
         });
 
-        const prevButton = document.getElementById('prev-card-btn');
-        if(prevButton) {
-            prevButton.addEventListener('click', () => {
-                currentCardIndex--;
-                showCard(currentCardIndex);
-            });
-        }
+    } catch (error) {
+        console.error("Error fetching deck performance:", error);
+        progressContent.innerHTML = `<div class="text-center text-red-500">Failed to load deck performance.</div>`;
     }
-
-    showCard(currentCardIndex);
 }
 
-		
+// --- NEW ---
+// This view shows the line chart for a specific deck
+async function renderDeckPerformanceChart(deckId, deckTopic) {
+    const progressContent = document.getElementById('progress-content');
+    if (!progressContent) return;
+    
+    setHeader(`Performance: ${deckTopic}`);
+
+    progressContent.innerHTML = `
+        <div class="flex items-center mb-4">
+            <button id="back-to-deck-performance" class="flex items-center text-sm text-blue-600 hover:underline">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                Back to Performance List
+            </button>
+        </div>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <div class="h-96">
+                <canvas id="deck-performance-chart"></canvas>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('back-to-deck-performance').addEventListener('click', renderDeckPerformanceView);
+
+    try {
+        const q = query(
+            collection(db, `/artifacts/${appId}/users/${userId}/quiz_results`), 
+            where("deckId", "==", deckId)
+        );
+        const snapshot = await getDocs(q);
+        let results = snapshot.docs.map(doc => doc.data());
+
+        // Sort results by timestamp ascending
+        results.sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
+
+        const labels = results.map(r => r.timestamp.toDate().toLocaleDateString());
+        const data = results.map(r => r.percentage);
+        
+        const ctx = document.getElementById('deck-performance-chart');
+        if (progressChartInstance) {
+            progressChartInstance.destroy();
+        }
+
+        progressChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Quiz Score (%)',
+                    data: data,
+                    fill: false,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%'
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("Error rendering deck performance chart:", error);
+        progressContent.innerHTML = `<div class="text-center text-red-500">Could not load chart data.</div>`;
+    }
+}
+
+
+// --- NEW ---
+// This function saves a completed quiz result to Firestore
+async function saveQuizResult(deckId, deckTopic, score, totalQuestions) {
+    if (!userId) return;
+    try {
+        const quizResultsCol = collection(db, `/artifacts/${appId}/users/${userId}/quiz_results`);
+        await addDoc(quizResultsCol, {
+            deckId: deckId,
+            deckTopic: deckTopic,
+            score: score,
+            totalQuestions: totalQuestions,
+            percentage: totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0,
+            timestamp: new Date()
+        });
+        console.log("Quiz result saved successfully.");
+    } catch (error) {
+        console.error("Error saving quiz result:", error);
+    }
+}
+
+
 async function generateQuizWithAI(deck) {
             const cardContent = deck.cards.map(c => `Q: ${c.question}\nA: ${c.answer}`).join('\n\n');
             const questionCount = Math.max(deck.cards.length, 5); // Ensure at least 5 questions
@@ -3691,5 +3855,3 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
-
-
