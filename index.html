@@ -1561,10 +1561,14 @@ async function generateQuizWithAI(deck) {
             const questionCount = Math.max(deck.cards.length, 5); // Ensure at least 5 questions
 
             const prompt = `
-                You are an expert quiz generator. Based on the following question-and-answer pairs from a flashcard deck, create a multiple-choice quiz with exactly ${questionCount} questions.
-                For each question, provide four options (A, B, C, D), with only one being the correct answer. The options should be relevant to the question.
-                The response MUST be a valid JSON array of objects. Each object in the array must have these exact keys: "question", "options" (an array of 4 strings), and "correctAnswer" (a string that exactly matches one of the options).
-                Do NOT include any other text, explanations, or markdown formatting outside of the JSON structure.
+                Generate a multiple-choice quiz based on the text I provide below.
+You must follow these specific rules for the quiz's design:
+
+Concise Options: Make all answer options (both correct and incorrect) as concise and least detailed as possible.
+Answer Length: Avoid making the correct answer consistently the longest option. The correct answer should often be shorter than or roughly equal in length to the incorrect options (distractors).
+Randomized Position: Randomly mix the position of the correct answer (A, B, C, D) for each question.
+JSON Output: The response MUST be a valid JSON array of objects. Each object must have keys "question", "options" (an array of 4 strings), and "correctAnswer" (a string matching one of the options). Do NOT include explanations or markdown.
+
 
                 Here is an example of the required format:
                 [
@@ -3588,3 +3592,4 @@ async function createUserProfile(user, username) {
     </script>
 </body>
 </html>
+
