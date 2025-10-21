@@ -881,109 +881,111 @@
         }
 
         function renderAppLayout() {
-            const appRoot = document.getElementById('app-root');
-            const username = userProfile?.username || auth.currentUser?.email;
-            appRoot.innerHTML = `
-                <div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200">
-                    <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col p-4">
-                        <div class="h-16 flex items-center px-2 flex-shrink-0">
-                            <span class="text-2xl font-bold">Synapse</span>
-                        </div>
-                        <nav id="main-nav" class="flex flex-col space-y-1 flex-shrink-0">
-                            <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
-                                My Decks
-                            </a>
-                            <a href="#" id="nav-progress" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                Progress
-                            </a>
-                            <a href="#" id="nav-public-decks" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                                Public Decks
-                            </a>
-                             <a href="#" id="nav-profile" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                                Profile
-                            </a>
-                            <a href="#" id="nav-requests" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium relative">
-                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                Requests
-                                <span id="requests-indicator" class="hidden absolute top-1 right-2 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
-                            </a>
-                        </nav>
-                        <div class="space-y-2 pt-2 flex-shrink-0">
-                            <button id="sidebar-quiz-btn" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Quiz</button>
-                            <button id="sidebar-add-deck-btn" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">Add Deck</button>
-                        </div>
-                        <div class="flex-grow pt-4 border-t border-gray-200 dark:border-gray-700 mt-2 flex flex-col min-h-0">
-                            <h3 class="px-2 text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex justify-between items-center flex-shrink-0">
-                                <span>Library</span>
-                                <div class="flex items-center space-x-2"><button id="library-add-btn" class="text-gray-400 hover:text-gray-600"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg></button></div>
-                            </h3>
-                            <div class="relative mt-2 px-2 flex-shrink-0">
-                                <input type="text" id="library-search-input" placeholder="Search..." class="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 focus:ring-blue-500 focus:border-blue-500">
-                                <div class="absolute inset-y-0 left-2 pl-1 flex items-center pointer-events-none"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div>
-                            </div>
-                            <div id="library-list" class="mt-2 space-y-1 flex-grow overflow-y-auto pr-2"></div>
-                        </div>
-                        <div class="mt-auto flex-shrink-0 border-t dark:border-gray-700 pt-4">
-                            <div class="flex items-center"><div class="flex-1 min-w-0"><p id="user-display-name" class="text-sm font-medium text-gray-800 dark:text-white truncate" title="${username}">${username}</p></div>
-                                <div class="ml-2 flex-shrink-0"><button id="logout-btn" title="Logout" class="text-gray-400 hover:text-red-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg></button></div>
-                            </div>
-                        </div>
-                    </aside>
-                    <div class="flex-1 flex flex-col overflow-hidden">
-                        <header class="h-16 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-6 flex-shrink-0">
-                            <div id="main-header"><h1 class="text-xl font-semibold">My Decks</h1></div>
-                            <div class="flex items-center space-x-4"><button id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5"><svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg><svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg></button></div>
-                        </header>
-                        <main id="app-content" class="flex-1 overflow-y-auto p-6"></main>
+    const appRoot = document.getElementById('app-root');
+    const username = userProfile?.username || auth.currentUser?.email;
+    appRoot.innerHTML = `
+        <div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200">
+            <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col p-4">
+                <div class="h-16 flex items-center px-2 flex-shrink-0">
+                    <span class="text-2xl font-bold">Synapse</span>
+                </div>
+                <nav id="main-nav" class="flex flex-col space-y-1 flex-shrink-0">
+                    <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
+                        My Decks
+                    </a>
+                    <a href="#" id="nav-progress" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        Progress
+                    </a>
+                    <a href="#" id="nav-public-decks" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        Public Decks
+                    </a>
+                     <a href="#" id="nav-profile" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        Profile
+                    </a>
+                    <a href="#" id="nav-requests" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium relative">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Requests
+                        <span id="requests-indicator" class="hidden absolute top-1 right-2 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+                    </a>
+                </nav>
+                <div class="space-y-2 pt-2 flex-shrink-0">
+                    <button id="sidebar-quiz-btn" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Quiz</button>
+                    <button id="sidebar-add-deck-btn" class="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">Add Deck</button>
+                </div>
+                <div class="flex-grow pt-4 border-t border-gray-200 dark:border-gray-700 mt-2 flex flex-col min-h-0">
+                    <h3 class="px-2 text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex justify-between items-center flex-shrink-0">
+                        <span>Library</span>
+                        <div class="flex items-center space-x-2"><button id="library-add-btn" class="text-gray-400 hover:text-gray-600"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg></button></div>
+                    </h3>
+                    <div class="relative mt-2 px-2 flex-shrink-0">
+                        <input type="text" id="library-search-input" placeholder="Search..." class="w-full pl-8 pr-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                        <div class="absolute inset-y-0 left-2 pl-1 flex items-center pointer-events-none"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div>
+                    </div>
+                    <div id="library-list" class="mt-2 space-y-1 flex-grow overflow-y-auto pr-2"></div>
+                </div>
+                <div class="mt-auto flex-shrink-0 border-t dark:border-gray-700 pt-4">
+                    <div class="flex items-center"><div class="flex-1 min-w-0"><p id="user-display-name" class="text-sm font-medium text-gray-800 dark:text-white truncate" title="${username}">${username}</p></div>
+                        <div class="ml-2 flex-shrink-0"><button id="logout-btn" title="Logout" class="text-gray-400 hover:text-red-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg></button></div>
                     </div>
                 </div>
-                <div id="modals-container"></div>
-            `;
-            setupEventListeners();
-        }
+            </aside>
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <header class="h-16 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-6 flex-shrink-0">
+                    <div id="main-header"><h1 class="text-xl font-semibold">My Decks</h1></div>
+                    <div class="flex items-center space-x-4"><button id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5"><svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg><svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg></button></div>
+                </header>
+                <main id="app-content" class="flex-1 overflow-y-auto p-6"></main>
+            </div>
+        </div>
+        <div id="modals-container"></div>
+    `;
+    // --- THIS IS THE FIX ---
+    // Initialize the theme *after* the layout HTML has been added to the page
+    initializeAndApplyTheme(); 
+    setupEventListeners();
+}
 
         function renderPublicLayout() {
-            const appRoot = document.getElementById('app-root');
-            appRoot.innerHTML = `
-                <div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200">
-                    <div class="flex-1 flex flex-col overflow-hidden">
-                        <header class="h-16 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-6 flex-shrink-0">
-                            <div id="main-header">
-                                </div>
-                            <div class="flex items-center space-x-4">
-                                <a href="${window.location.pathname.split('?')[0]}" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Sign In</a>
-                                <button id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5">
-                                    <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
-                                    <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
-                                </button>
-                            </div>
-                        </header>
-                        <main id="app-content" class="flex-1 overflow-y-auto p-6"></main>
+    const appRoot = document.getElementById('app-root');
+    appRoot.innerHTML = `
+        <div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-200">
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <header class="h-16 bg-white dark:bg-gray-800 border-b dark:border-gray-700 flex items-center justify-between px-6 flex-shrink-0">
+                    <div id="main-header">
+                        </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="${window.location.pathname.split('?')[0]}" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Sign In</a>
+                        <button id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5">
+                            <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                            <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                        </button>
                     </div>
-                </div>
-                <div id="modals-container"></div>
-            `;
+                </header>
+                <main id="app-content" class="flex-1 overflow-y-auto p-6"></main>
+            </div>
+        </div>
+        <div id="modals-container"></div>
+    `;
 
-            // Setup the theme toggle for the public view
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-            const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
-            if (document.documentElement.classList.contains('dark')) {
-                themeToggleLightIcon.classList.remove('hidden');
-            } else {
-                themeToggleDarkIcon.classList.remove('hidden');
-            }
-            themeToggleBtn.addEventListener('click', () => {
-                themeToggleDarkIcon.classList.toggle('hidden');
-                themeToggleLightIcon.classList.toggle('hidden');
-                const isDark = document.documentElement.classList.toggle('dark');
-                localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            });
-        }
+    // --- THIS IS THE FIX ---
+    initializeAndApplyTheme();
+
+    // Setup the click listener for the public view
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    themeToggleBtn.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+
+        // Also toggle the icons
+        document.getElementById('theme-toggle-dark-icon').classList.toggle('hidden');
+        document.getElementById('theme-toggle-light-icon').classList.toggle('hidden');
+    });
+}
         
         function renderLibrary(decks, searchTerm = '') {
     const libraryList = document.getElementById('library-list');
@@ -3376,56 +3378,52 @@ function initializeAndApplyTheme() {
 }
         
         function startApp(firebaseConfig) {
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                storage = getStorage(app); // Make sure storage is initialized
-                initializeAndApplyTheme();
+    try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        storage = getStorage(app); 
 
-                onAuthStateChanged(auth, (user) => {
-                    // --- FIX: Moved URL parsing inside the listener ---
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const profileId = urlParams.get('profile');
+        // The initializeAndApplyTheme() call has been removed from here
 
-                    if (user) {
-                        userId = user.uid;
-                        fetchUserProfile();
-                        fetchAndDisplayDecks();
-                        fetchProgressSubjects();
-                        listenForFollowRequests();
-                        renderAppLayout();
+        onAuthStateChanged(auth, (user) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const profileId = urlParams.get('profile');
 
-                        if (profileId && profileId !== userId) {
-                            // If a profile ID is in the URL, show that profile
-                            renderPublicProfileView(profileId);
-                        } else {
-                            // Otherwise, default to the user's decks
-                            renderDecksView(allUserDecks);
-                        }
-                    } else {
-                        if (profileId) {
-                            // If not logged in but a profile ID exists, show public profile
-                            renderPublicLayout();
-                            renderPublicProfileView(profileId);
-                        } else {
-                            // Otherwise, show the login page
-                            renderLoginView();
-                        }
-                    }
-                });
+            if (user) {
+                userId = user.uid;
+                fetchUserProfile();
+                fetchAndDisplayDecks();
+                fetchProgressSubjects();
+                listenForFollowRequests();
+                renderAppLayout(); // This will now handle the theme initialization
 
-                if (!document.getElementById('modals-container')) {
-                    const modalsDiv = document.createElement('div');
-                    modalsDiv.id = 'modals-container';
-                    document.body.appendChild(modalsDiv);
+                if (profileId && profileId !== userId) {
+                    renderPublicProfileView(profileId);
+                } else {
+                    renderDecksView(allUserDecks);
                 }
-
-            } catch (error) {
-                console.error("Error initializing app:", error);
-                document.getElementById('app-root').innerHTML = '<div class="text-center text-red-500">Failed to load application.</div>';
+            } else {
+                if (profileId) {
+                    renderPublicLayout(); // This will also handle the theme initialization
+                    renderPublicProfileView(profileId);
+                } else {
+                    renderLoginView();
+                }
             }
+        });
+
+        if (!document.getElementById('modals-container')) {
+            const modalsDiv = document.createElement('div');
+            modalsDiv.id = 'modals-container';
+            document.body.appendChild(modalsDiv);
         }
+
+    } catch (error) {
+        console.error("Error initializing app:", error);
+        document.getElementById('app-root').innerHTML = '<div class="text-center text-red-500">Failed to load application.</div>';
+    }
+}
 
 // --- Follow/Follower Logic ---
 
@@ -3981,5 +3979,6 @@ function renderQuizModal(deck) {
     </script>
 </body>
 </html>
+
 
 
