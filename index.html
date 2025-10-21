@@ -3260,82 +3260,120 @@ async function createUserProfile(user, username) {
             });
         }
         
-        // --- EVENT LISTENERS & INITIALIZATION ---
-        
-        function setupEventListeners() {
-            // Sidebar listeners
-            document.getElementById('nav-my-decks').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderDecksView(allUserDecks);
-            });
-            document.getElementById('nav-progress').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderProgressView();
-            });
-             document.getElementById('nav-public-decks').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderPublicDecksView();
-            });
-             document.getElementById('nav-profile').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderProfileView();
-            });
+        / --- MODIFIED ---
+// The theme toggle event listener has been restored.
+function setupEventListeners() {
+    // Sidebar listeners
+    document.getElementById('nav-my-decks').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderDecksView(allUserDecks);
+    });
+    document.getElementById('nav-progress').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderProgressView();
+    });
+     document.getElementById('nav-public-decks').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderPublicDecksView();
+    });
+     document.getElementById('nav-profile').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderProfileView();
+    });
 
-            // THIS IS THE MISSING LINE
-            document.getElementById('nav-requests').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderRequestsView();
-            });
+    document.getElementById('nav-requests').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderRequestsView();
+    });
 
-            document.getElementById('sidebar-add-deck-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                renderAddDeckModal();
-            });
+    document.getElementById('sidebar-add-deck-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderAddDeckModal();
+    });
 
-            document.getElementById('library-add-btn').addEventListener('click', renderAddDeckModal);
+    document.getElementById('library-add-btn').addEventListener('click', renderAddDeckModal);
 
-            document.getElementById('library-list').addEventListener('click', (e) => {
-                const target = e.target.closest('a');
-                if (target && target.dataset.id) {
-                    e.preventDefault();
-                    const deckId = target.dataset.id;
-                    renderSingleDeckView(deckId);
-                }
-            });
+    document.getElementById('library-list').addEventListener('click', (e) => {
+        const target = e.target.closest('a');
+        if (target && target.dataset.id) {
+            e.preventDefault();
+            const deckId = target.dataset.id;
+            renderSingleDeckView(deckId);
+        }
+    });
 
-             document.getElementById('sidebar-quiz-btn').addEventListener('click', (e) => {
-                e.preventDefault();
-                 if (allUserDecks.length > 0) {
-                    renderQuizSelectionModal(allUserDecks);
+     document.getElementById('sidebar-quiz-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+         if (allUserDecks.length > 0) {
+            renderQuizSelectionModal(allUserDecks);
+        } else {
+            alert("You don't have any decks to quiz! Create a deck first.");
+        }
+    });
+
+    document.getElementById('library-search-input').addEventListener('input', (e) => {
+        const searchTerm = e.target.value;
+        const filteredDecks = searchTerm
+            ? allUserDecks.filter(deck => deck.topic.toLowerCase().includes(searchTerm.toLowerCase()))
+            : allUserDecks;
+        renderLibrary(filteredDecks, searchTerm);
+    });
+
+    // Logout button
+    document.getElementById('logout-btn').addEventListener('click', handleLogout);
+    
+    // --- THEME TOGGLE LOGIC (RESTORED) ---
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+            const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+            // toggle icons inside button
+            themeToggleDarkIcon.classList.toggle('hidden');
+            themeToggleLightIcon.classList.toggle('hidden');
+
+            // if set via local storage previously
+            if (localStorage.getItem('theme')) {
+                if (localStorage.getItem('theme') === 'light') {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
                 } else {
-                    alert("You don't have any decks to quiz! Create a deck first.");
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
                 }
-            });
 
-            document.getElementById('library-search-input').addEventListener('input', (e) => {
-                const searchTerm = e.target.value;
-                const filteredDecks = searchTerm
-                    ? allUserDecks.filter(deck => deck.topic.toLowerCase().includes(searchTerm.toLowerCase()))
-                    : allUserDecks;
-                renderLibrary(filteredDecks, searchTerm);
-            });
-
-            // Logout button
-            document.getElementById('logout-btn').addEventListener('click', handleLogout);
-            
-            // Theme toggle listener (Your existing theme logic is correct)
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            themeToggleBtn.addEventListener('click', () => { /* ... existing theme logic ... */ });
-        }
-
-        function initializeAndApplyTheme() {
-            const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            if (theme === 'dark') {
-                document.documentElement.classList.add('dark');
+            // if NOT set via local storage previously
             } else {
-                document.documentElement.classList.remove('dark');
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                }
             }
-        }
+        });
+    }
+}
+
+        // --- MODIFIED ---
+// This function now also handles showing the correct sun/moon icon on page load.
+function initializeAndApplyTheme() {
+    const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+    const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        if (themeToggleLightIcon) themeToggleLightIcon.classList.remove('hidden');
+        if (themeToggleDarkIcon) themeToggleDarkIcon.classList.add('hidden');
+    } else {
+        document.documentElement.classList.remove('dark');
+        if (themeToggleDarkIcon) themeToggleDarkIcon.classList.remove('hidden');
+        if (themeToggleLightIcon) themeToggleLightIcon.classList.add('hidden');
+    }
+}
         
         function startApp(firebaseConfig) {
             try {
@@ -3943,3 +3981,4 @@ function renderQuizModal(deck) {
     </script>
 </body>
 </html>
+
