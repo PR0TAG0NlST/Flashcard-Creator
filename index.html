@@ -3932,31 +3932,52 @@ function initializeAndApplyTheme() {
 function renderQuizModal(deck) {
     let currentCardIndex = 0;
 
-    // --- MODIFIED: Increased modal max-width ---
     const modalContent = `
         <div id="quiz-content" class="flex flex-col items-center justify-center">
             <!-- Card will be rendered here -->
         </div>
     `;
 
+    // Render the modal structure first
     renderModal('quiz-modal', `${deck.topic} Study Session`, modalContent, () => {}, '');
 
-    // Adjust modal size after rendering
+    // --- NEW: Style the specific modal header ---
     const quizModalElement = document.getElementById('quiz-modal');
     if (quizModalElement) {
+        // Adjust modal width
         const modalDialog = quizModalElement.querySelector('.bg-white'); // Target the inner dialog
         if (modalDialog) {
-            modalDialog.classList.remove('max-w-md'); // Remove default max width
-            modalDialog.classList.add('max-w-lg'); // Apply larger max width
+            modalDialog.classList.remove('max-w-md');
+            modalDialog.classList.add('max-w-lg');
+        }
+        // Style the header
+        const modalHeader = quizModalElement.querySelector('.p-4.border-b');
+        const modalTitleElement = modalHeader?.querySelector('h3');
+        if (modalHeader && modalTitleElement) {
+            // Apply gradient background to header
+            modalHeader.classList.remove('bg-white', 'dark:bg-gray-800', 'border-b', 'dark:border-gray-700'); // Remove default styles
+            modalHeader.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-indigo-600', 'dark:from-blue-700', 'dark:to-indigo-800', 'rounded-t-lg');
+            // Make title white
+            modalTitleElement.classList.add('text-white');
+            // Make close button visible on dark background
+             const closeButton = modalHeader.querySelector('.modal-close-btn svg');
+             if(closeButton) {
+                 closeButton.classList.add('text-white', 'hover:text-gray-200');
+             }
         }
     }
+    // --- END NEW HEADER STYLING ---
 
 
-    // Hide default save/cancel buttons for quiz
-    const quizModal = document.getElementById('quiz-modal');
-    quizModal.querySelector('#modal-save-btn').style.display = 'none';
-    const footerCancelButton = quizModal.querySelector('.flex.justify-end > .modal-close-btn');
-    if(footerCancelButton) footerCancelButton.style.display = 'none';
+    // Hide default footer buttons
+    const quizModal = document.getElementById('quiz-modal'); // Re-select in case it wasn't found before
+    if (quizModal) {
+        const saveButton = quizModal.querySelector('#modal-save-btn');
+        const footerCancelButton = quizModal.querySelector('.flex.justify-end > .modal-close-btn');
+        if(saveButton) saveButton.style.display = 'none';
+        if(footerCancelButton) footerCancelButton.style.display = 'none';
+    }
+
 
     function showCard(index) {
         const quizContent = document.getElementById('quiz-content');
@@ -3965,32 +3986,33 @@ function renderQuizModal(deck) {
                 <h2 class="text-2xl font-bold mb-4">Study Session Complete!</h2>
                 <button id="quiz-close-btn-final" class="px-4 py-2 text-white bg-blue-600 rounded-lg">Close</button>
             </div>`;
-             document.getElementById('quiz-close-btn-final').addEventListener('click', () => document.getElementById('quiz-modal').remove());
+             document.getElementById('quiz-close-btn-final').addEventListener('click', () => {
+                 const modalToRemove = document.getElementById('quiz-modal');
+                 if (modalToRemove) modalToRemove.remove();
+             });
             return;
         }
 
         const cardData = deck.cards[index];
-        // --- MODIFIED: Restored gradient, added text-white, increased bottom margin ---
+        // --- MODIFIED: Different backgrounds, removed comments ---
         quizContent.innerHTML = `
             <p class="text-sm text-gray-500 mb-2">${index + 1} / ${deck.cards.length}</p>
-            {/* Increased height to h-80 and bottom margin to mb-6 */}
-            <div class="scene w-full h-80 mb-6"> {/* Increased bottom margin */}
+            <div class="scene w-full h-80 mb-6">
                 <div id="quiz-card" class="card relative w-full h-full cursor-pointer">
-                    {/* Restored gradient, added text-white, kept overflow */}
-                    <div class="card-face absolute w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-blue-700 dark:to-indigo-800 text-white rounded-lg shadow-lg overflow-y-auto">
+                    {/* Question side: Cloudy white/gray background, dark text */}
+                    <div class="card-face absolute w-full h-full flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg shadow-lg overflow-y-auto">
                         <p class="text-xl text-center">${cardData.question}</p>
                     </div>
-                    {/* Restored gradient, added text-white, kept overflow */}
+                    {/* Answer side: Blue gradient background, white text */}
                     <div class="card-face card-face-back absolute w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-500 to-blue-600 dark:from-indigo-700 dark:to-blue-800 text-white rounded-lg shadow-lg overflow-y-auto">
                          <p class="text-xl text-center font-semibold">${cardData.answer}</p>
                     </div>
                 </div>
             </div>
              <div id="explain-btn-container" class="h-12 flex justify-center items-center">
-                {/* Explain button will be dynamically added here */}
+                {/* Explain button added dynamically */}
             </div>
-            {/* Reduced top margin slightly */}
-            <div class="mt-1 flex items-center justify-center space-x-4"> {/* Adjusted margin */}
+            <div class="mt-1 flex items-center justify-center space-x-4">
                 <button id="prev-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600" ${index === 0 ? 'disabled' : ''}>Previous</button>
                 <button id="flip-card-btn" class="px-6 py-2 rounded-lg bg-gray-200 dark:bg-gray-600">Flip</button>
                 <button id="next-card-btn" class="px-6 py-2 rounded-lg bg-blue-600 text-white">Next</button>
@@ -4008,30 +4030,33 @@ function renderQuizModal(deck) {
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2V10a2 2 0 012-2h8z"></path></svg>
                         Explain
                     </button>`;
-                document.getElementById('explain-card-btn').addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent quiz modal from handling this click
-                    renderChatbotModal(cardData);
-                });
+                // Check if button exists before adding listener
+                const explainBtn = document.getElementById('explain-card-btn');
+                if (explainBtn) {
+                    explainBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        renderChatbotModal(cardData);
+                    });
+                }
             } else {
                 explainContainer.innerHTML = '';
             }
         }
 
-        cardElement.addEventListener('click', flipCard);
-        document.getElementById('flip-card-btn').addEventListener('click', flipCard);
-
-        document.getElementById('next-card-btn').addEventListener('click', () => {
+        // Add event listeners only if elements exist
+        if (cardElement) cardElement.addEventListener('click', flipCard);
+        const flipBtn = document.getElementById('flip-card-btn');
+        if (flipBtn) flipBtn.addEventListener('click', flipCard);
+        const nextBtn = document.getElementById('next-card-btn');
+        if (nextBtn) nextBtn.addEventListener('click', () => {
             currentCardIndex++;
             showCard(currentCardIndex);
         });
-
-        const prevButton = document.getElementById('prev-card-btn');
-        if(prevButton) {
-            prevButton.addEventListener('click', () => {
-                currentCardIndex--;
-                showCard(currentCardIndex);
-            });
-        }
+        const prevBtn = document.getElementById('prev-card-btn');
+        if (prevBtn) prevBtn.addEventListener('click', () => {
+            currentCardIndex--;
+            showCard(currentCardIndex);
+        });
     }
 
     showCard(currentCardIndex);
@@ -4040,5 +4065,6 @@ function renderQuizModal(deck) {
     </script>
 </body>
 </html>
+
 
 
