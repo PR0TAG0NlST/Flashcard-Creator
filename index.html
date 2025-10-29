@@ -898,7 +898,7 @@
                     </a>
                     <a href="#" id="nav-notes" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                         <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                         Notes
                     </a>
@@ -3324,60 +3324,119 @@ async function fileToGenerativePart(file) {
 
         // === NOTES FEATURE ===
 
-// Fetch notes from Firestore
 function fetchUserNotes() {
     if (!userId) return;
-    const notesCol = collection(db, `/artifacts/${appId}/users/${userId}/notes`);
-    onSnapshot(notesCol, (snapshot) => {
-        allUserNotes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const header = document.querySelector('#main-header h1')?.textContent;
-        if (header === 'Notes') {
+    onSnapshot(collection(db, `/artifacts/${appId}/users/${userId}/notes`), snap => {
+        allUserNotes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (document.querySelector('#main-header h1')?.textContent.includes('Notes')) {
             renderNotesView();
         }
     });
 }
 
-// Render Notes View
 function renderNotesView() {
     setActiveNav('nav-notes');
-    setHeader('Notes');
+    setHeader('Notes – Upload Files');
     const content = document.getElementById('app-content');
+
     content.innerHTML = `
         <div class="max-w-4xl mx-auto">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold">My Notes</h2>
-                <button id="add-note-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ Add Note</button>
+                <h2 class="text-xl font-semibold">Your Files</h2>
+                <label class="px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700">
+                    + Upload File
+                    <input type="file" id="notes-file-input" class="hidden" multiple>
+                </label>
             </div>
+
             <div id="notes-list" class="space-y-4">
-                ${allUserNotes.length > 0 ? allUserNotes.map(note => `
-                    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-                        <h3 class="font-medium text-lg">${note.title}</h3>
-                        <p class="text-gray-600 dark:text-gray-300 mt-2 text-sm">${note.content.substring(0, 150)}${note.content.length > 150 ? '...' : ''}</p>
-                        <div class="mt-3 flex space-x-2">
-                            <button class="edit-note-btn text-sm text-blue-600 hover:underline" data-id="${note.id}">Edit</button>
-                            <button class="delete-note-btn text-sm text-red-600 hover:underline" data-id="${note.id}">Delete</button>
+                ${allUserNotes.length ? allUserNotes.map(n => `
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <div>
+                                <p class="font-medium">${n.fileName}</p>
+                                <p class="text-sm text-gray-500">${n.uploadedAt?.toDate?.().toLocaleString() || ''}</p>
+                            </div>
                         </div>
-                    </div>
-                `).join('') : '<p class="text-center text-gray-500 py-8">No notes yet. Click "Add Note" to start!</p>'}
+                        <div class="flex space-x-2">
+                            <a href="${n.downloadURL}" target="_blank" class="text-blue-600 hover:underline text-sm">Open</a>
+                            <button class="rename-note-btn text-sm text-gray-600 hover:underline" data-id="${n.id}">Rename</button>
+                            <button class="delete-note-btn text-sm text-red-600 hover:underline" data-id="${n.id}">Delete</button>
+                        </div>
+                    </div>`).join('') 
+                    : '<p class="text-center text-gray-500 py-8">No files yet. Upload one to get started.</p>'
+                }
             </div>
         </div>
     `;
 
-    document.getElementById('add-note-btn').addEventListener('click', renderAddNoteModal);
+    // Upload
+    const input = document.getElementById('notes-file-input');
+    input.onchange = () => {
+        if (input.files.length) uploadNotesFiles(Array.from(input.files));
+        input.value = '';
+    };
 
-    content.addEventListener('click', async (e) => {
-        const target = e.target;
-        if (target.classList.contains('edit-note-btn')) {
-            const noteId = target.dataset.id;
-            const note = allUserNotes.find(n => n.id === noteId);
-            renderEditNoteModal(note);
-        } else if (target.classList.contains('delete-note-btn')) {
-            const noteId = target.dataset.id;
-            if (confirm('Delete this note permanently?')) {
-                await deleteDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, noteId));
-            }
+    // Rename / Delete
+    content.onclick = async e => {
+        const t = e.target;
+        if (t.classList.contains('delete-note-btn')) {
+            if (confirm('Delete permanently?')) await deleteNoteFile(t.dataset.id);
         }
-    });
+        if (t.classList.contains('rename-note-btn')) {
+            const note = allUserNotes.find(n => n.id === t.dataset.id);
+            renderRenameNoteModal(note);
+        }
+    };
+}
+
+async function uploadNotesFiles(files) {
+    const list = document.getElementById('notes-list');
+    const prog = document.createElement('div');
+    prog.id = 'upload-progress';
+    prog.className = 'text-center text-sm text-gray-600 py-2';
+    prog.textContent = 'Uploading...';
+    list.before(prog);
+
+    for (const file of files) {
+        const path = `users/${userId}/notes/${Date.now()}_${file.name}`;
+        const refStorage = ref(storage, path);
+        await uploadBytes(refStorage, file);
+        const url = await getDownloadURL(refStorage);
+
+        await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/notes`), {
+            fileName: file.name,
+            downloadURL: url,
+            uploadedAt: new Date(),
+            size: file.size
+        });
+    }
+    prog.remove();
+}
+
+async function deleteNoteFile(id) {
+    const note = allUserNotes.find(n => n.id === id);
+    if (!note) return;
+    try {
+        await deleteObject(ref(storage, note.downloadURL)).catch(() => {});
+        await deleteDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, id));
+    } catch (e) { alert('Delete failed'); }
+}
+
+function renderRenameNoteModal(note) {
+    renderModal('rename-note-modal', 'Rename File', `
+        <input type="text" id="new-name" class="mt-1 block w-full px-3 py-2 border rounded-md" value="${note.fileName}">
+    `, async () => {
+        const name = document.getElementById('new-name').value.trim();
+        if (name && name !== note.fileName) {
+            await updateDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, note.id), { fileName: name });
+            document.getElementById('rename-note-modal')?.remove();
+        }
+    }, 'Save');
 }
 
 // Add Note Modal
