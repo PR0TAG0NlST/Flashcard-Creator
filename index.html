@@ -101,6 +101,7 @@
 
         // Global variables
         let app, db, auth, storage, userId, userProfile;
+        let allUserNotes = [];
         let allUserDecks = [];
         let progressSubjects = [];
         let progressChartInstance = null;
@@ -505,185 +506,189 @@
         }
 
         function renderAddCardModal(deckId) {
-            const modalContent = `
-                <div>
-                    <!-- Tabs -->
-                    <div class="border-b border-gray-200 dark:border-gray-700">
-                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                            <button id="simple-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
-                                Simple Add
-                            </button>
-                            <button id="bulk-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
-                                Bulk Add
-                            </button>
-                             <button id="ai-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
-                                Generate with AI
-                            </button>
-                        </nav>
+    const modalContent = `
+        <div>
+            <!-- Tabs -->
+            <div class="border-b border-gray-200 dark:border-gray-700">
+                <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
+                    <button id="simple-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
+                        Simple Add
+                    </button>
+                    <button id="bulk-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
+                        Bulk Add
+                    </button>
+                    <button id="ai-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
+                        Generate with AI
+                    </button>
+                    <button id="file-add-tab" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600 border-transparent">
+                        From File
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Form Content -->
+            <form id="add-card-form" class="mt-6">
+                {/* Simple Add View */}
+                <div id="simple-add-view" class="space-y-4">
+                     <div>
+                        <label for="card-question" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Question</label>
+                        <textarea id="card-question" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
                     </div>
-
-                    <!-- Form Content -->
-                    <form id="add-card-form" class="mt-6">
-                        <!-- Simple Add View (Default) -->
-                        <div id="simple-add-view" class="space-y-4">
-                            <div>
-                                <label for="card-question" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Question</label>
-                                <textarea id="card-question" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                            </div>
-                            <div>
-                                <label for="card-answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Answer</label>
-                                <textarea id="card-answer" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Bulk Add View (Hidden by default) -->
-                        <div id="bulk-add-view" class="hidden">
-                             <div>
-                                <label for="bulk-cards-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cards</label>
-                                <textarea id="bulk-cards-input" rows="10" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Question 1: Answer 1\n\nQuestion 2: Answer 2"></textarea>
-                                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Separate cards with a blank line. Separate question and answer with a colon (:).</p>
-                            </div>
-                        </div>
-                        <!-- AI Add View (Hidden by default) -->
-                        <div id="ai-add-view" class="hidden">
-                             <div class="space-y-4">
-                                <div>
-                                    <label for="ai-topic-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic or Notes</label>
-                                    <textarea id="ai-topic-input" rows="8" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter a topic like 'Cellular Respiration' or paste your notes here..."></textarea>
-                                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">The AI will generate flashcards based on your input.</p>
-                                </div>
-                                <div>
-                                    <label for="ai-card-count" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Cards: <span id="ai-card-count-label" class="font-bold">8</span></label>
-                                    <input type="range" id="ai-card-count" name="ai-card-count" min="3" max="20" value="8" class="mt-1 block w-full">
-                                </div>
-                                <div id="ai-loader" class="hidden mt-4 flex items-center justify-center">
-                                    <div class="loader"></div>
-                                    <p class="ml-2 text-sm text-gray-500">Generating cards...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
+                    <div>
+                        <label for="card-answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Answer</label>
+                        <textarea id="card-answer" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+                    </div>
                 </div>
-            `;
+                {/* Bulk Add View */}
+                <div id="bulk-add-view" class="hidden">
+                     <div>
+                        <label for="bulk-cards-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cards</label>
+                        <textarea id="bulk-cards-input" rows="10" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Question 1: Answer 1\n\nQuestion 2: Answer 2"></textarea>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Separate cards with a blank line. Separate question and answer with a colon (:).</p>
+                    </div>
+                </div>
+                {/* AI Add View */}
+                <div id="ai-add-view" class="hidden">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="ai-topic-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Topic or Notes</label>
+                            <textarea id="ai-topic-input" rows="8" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter a topic like 'Cellular Respiration' or paste your notes here..."></textarea>
+                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">The AI will generate flashcards based on your input.</p>
+                        </div>
+                        <div>
+                            <label for="ai-card-count" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Cards: <span id="ai-card-count-label" class="font-bold">8</span></label>
+                            <input type="range" id="ai-card-count" name="ai-card-count" min="3" max="20" value="8" class="mt-1 block w-full">
+                        </div>
+                        <div id="ai-loader" class="hidden mt-4 flex items-center justify-center">
+                            <div class="loader"></div>
+                            <p class="ml-2 text-sm text-gray-500">Generating cards...</p>
+                        </div>
+                    </div>
+                </div>
+                {/* File Add View */}
+                <div id="file-add-view" class="hidden">
+                     <div class="space-y-4">
+                         <div>
+                            <label for="ai-file-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Upload Document</label>
+                            <input type="file" id="ai-file-input" required class="mt-1 block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt">
+                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">The AI will read your file to generate flashcards.</p>
+                        </div>
+                        <div>
+                            <label for="ai-file-card-count" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Number of Cards: <span id="ai-file-card-count-label" class="font-bold">8</span></label>
+                            <input type="range" id="ai-file-card-count" name="ai-file-card-count" min="3" max="20" value="8" class="mt-1 block w-full">
+                        </div>
+                        <div id="file-ai-loader" class="hidden mt-4 flex items-center justify-center">
+                            <div class="loader"></div>
+                            <p class="ml-2 text-sm text-gray-500">Reading file & generating cards...</p>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
 
-            renderModal('add-card-modal', 'Add New Card(s)', modalContent,
-            () => { // onSave logic for Simple and Bulk add
-                const simpleAddView = document.getElementById('simple-add-view');
+    // Render modal
+    renderModal('add-card-modal', 'Add New Card(s)', modalContent, () => {}, 'Add Card(s)');
+
+    // Get elements AFTER rendering
+    const simpleTab = document.getElementById('simple-add-tab');
+    const bulkTab = document.getElementById('bulk-add-tab');
+    const aiTab = document.getElementById('ai-add-tab');
+    const fileTab = document.getElementById('file-add-tab');
+
+    const simpleView = document.getElementById('simple-add-view');
+    const bulkView = document.getElementById('bulk-add-view');
+    const aiView = document.getElementById('ai-add-view');
+    const fileView = document.getElementById('file-add-view');
+
+    const saveButton = document.getElementById('modal-save-btn');
+
+    // Safety check
+    if (!saveButton || !simpleTab || !bulkTab || !aiTab || !fileTab || !simpleView || !bulkView || !aiView || !fileView) {
+        console.error("Modal elements not found!");
+        return;
+    }
+
+    const allTabs = [simpleTab, bulkTab, aiTab, fileTab];
+    const allViews = [simpleView, bulkView, aiView, fileView];
+
+    function activateTab(activeTab, activeView) {
+        allTabs.forEach(tab => {
+            tab.classList.remove('text-blue-600', 'border-blue-600');
+            tab.classList.add('text-gray-500', 'border-transparent');
+        });
+        allViews.forEach(view => view.classList.add('hidden'));
+
+        activeTab.classList.add('text-blue-600', 'border-blue-600');
+        activeTab.classList.remove('text-gray-500', 'border-transparent');
+        activeView.classList.remove('hidden');
+
+        // Update save button
+        if (activeTab === aiTab) {
+            saveButton.textContent = 'Generate Cards';
+            saveButton.onclick = () => generateCardsWithAI(deckId);
+        } else if (activeTab === fileTab) {
+            saveButton.textContent = 'Generate from File';
+            saveButton.onclick = () => generateCardsFromFile(deckId);
+        } else {
+            saveButton.textContent = 'Add Card(s)';
+            saveButton.onclick = () => {
                 let newCards = [];
+                const simpleActive = !simpleView.classList.contains('hidden');
+                const bulkActive = !bulkView.classList.contains('hidden');
 
-                if (!simpleAddView.classList.contains('hidden')) { // Simple Add Mode
-                    const question = document.getElementById('card-question').value.trim();
-                    const answer = document.getElementById('card-answer').value.trim();
-                    if (question && answer) {
-                        newCards.push({ question, answer });
-                    }
-                } else { // Bulk Add Mode
-                    const bulkText = document.getElementById('bulk-cards-input').value.trim();
-                    if (bulkText) {
-                        const cardBlocks = bulkText.split('\n\n');
-                        newCards = cardBlocks
-                            .map(block => {
-                                if (block.trim() === '') return null;
-                                const parts = block.split(':');
-                                if (parts.length >= 2) {
-                                    const question = parts[0].trim();
-                                    const answer = parts.slice(1).join(':').trim();
-                                    if (question && answer) {
-                                        return { question, answer };
-                                    }
-                                }
-                                return null;
-                            })
-                            .filter(card => card !== null);
+                if (simpleActive) {
+                    const q = document.getElementById('card-question').value.trim();
+                    const a = document.getElementById('card-answer').value.trim();
+                    if (q && a) newCards.push({ question: q, answer: a });
+                } else if (bulkActive) {
+                    const text = document.getElementById('bulk-cards-input').value.trim();
+                    if (text) {
+                        const blocks = text.split('\n\n');
+                        newCards = blocks.map(block => {
+                            const parts = block.split(':');
+                            if (parts.length < 2) return null;
+                            const question = parts[0].trim();
+                            const answer = parts.slice(1).join(':').trim();
+                            return question && answer ? { question, answer } : null;
+                        }).filter(Boolean);
                     }
                 }
 
                 if (newCards.length > 0) {
                     addMultipleCardsToDeck(deckId, newCards);
                     document.getElementById('add-card-modal')?.remove();
-                }
-
-            }, 'Add Card(s)');
-
-            // --- Tab Switching Logic ---
-            const simpleTab = document.getElementById('simple-add-tab');
-            const bulkTab = document.getElementById('bulk-add-tab');
-            const aiTab = document.getElementById('ai-add-tab');
-            const simpleView = document.getElementById('simple-add-view');
-            const bulkView = document.getElementById('bulk-add-view');
-            const aiView = document.getElementById('ai-add-view');
-            const saveButton = document.getElementById('modal-save-btn');
-            
-            const allTabs = [simpleTab, bulkTab, aiTab];
-            const allViews = [simpleView, bulkView, aiView];
-            
-            function activateTab(activeTab, activeView) {
-                allTabs.forEach(tab => {
-                    tab.classList.remove('text-blue-600', 'border-blue-600');
-                    tab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
-                });
-                allViews.forEach(view => view.classList.add('hidden'));
-
-                activeTab.classList.add('text-blue-600', 'border-blue-600');
-                activeTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300', 'dark:text-gray-400', 'dark:hover:text-gray-300', 'dark:hover:border-gray-600', 'border-transparent');
-                activeView.classList.remove('hidden');
-
-                if (activeTab === aiTab) {
-                    saveButton.textContent = 'Generate Cards';
-                    saveButton.onclick = () => generateCardsWithAI(deckId);
                 } else {
-                    saveButton.textContent = 'Add Card(s)';
-                    saveButton.onclick = () => {
-                         const simpleAddView = document.getElementById('simple-add-view');
-                        let newCards = [];
-
-                        if (document.getElementById('simple-add-view') && !document.getElementById('simple-add-view').classList.contains('hidden')) {
-                            const question = document.getElementById('card-question').value.trim();
-                            const answer = document.getElementById('card-answer').value.trim();
-                            if (question && answer) {
-                                newCards.push({ question, answer });
-                            }
-                        } else if (document.getElementById('bulk-add-view') && !document.getElementById('bulk-add-view').classList.contains('hidden')) {
-                            const bulkText = document.getElementById('bulk-cards-input').value.trim();
-                            if (bulkText) {
-                                const cardBlocks = bulkText.split('\n\n');
-                                newCards = cardBlocks
-                                    .map(block => {
-                                        if (block.trim() === '') return null;
-                                        const parts = block.split(':');
-                                        if (parts.length >= 2) {
-                                            const question = parts[0].trim();
-                                            const answer = parts.slice(1).join(':').trim();
-                                            if (question && answer) {
-                                                return { question, answer };
-                                            }
-                                        }
-                                        return null;
-                                    })
-                                    .filter(card => card !== null);
-                            }
-                        }
-
-                        if (newCards.length > 0) {
-                            addMultipleCardsToDeck(deckId, newCards);
-                            document.getElementById('add-card-modal')?.remove();
-                        }
-                    };
+                    alert("Please enter valid card(s).");
                 }
-            }
-            
-            simpleTab.addEventListener('click', () => activateTab(simpleTab, simpleView));
-            bulkTab.addEventListener('click', () => activateTab(bulkTab, bulkView));
-            aiTab.addEventListener('click', () => activateTab(aiTab, aiView));
-            
-            const cardCountSlider = document.getElementById('ai-card-count');
-            const cardCountLabel = document.getElementById('ai-card-count-label');
-            if(cardCountSlider && cardCountLabel) {
-                cardCountSlider.addEventListener('input', (e) => {
-                    cardCountLabel.textContent = e.target.value;
-                });
-            }
+            };
         }
+    }
+
+    // Attach event listeners INSIDE the function
+    simpleTab.addEventListener('click', () => activateTab(simpleTab, simpleView));
+    bulkTab.addEventListener('click', () => activateTab(bulkTab, bulkView));
+    aiTab.addEventListener('click', () => activateTab(aiTab, aiView));
+    fileTab.addEventListener('click', () => activateTab(fileTab, fileView));
+
+    // Sliders
+    const cardCountSlider = document.getElementById('ai-card-count');
+    const cardCountLabel = document.getElementById('ai-card-count-label');
+    if (cardCountSlider && cardCountLabel) {
+        cardCountSlider.addEventListener('input', (e) => cardCountLabel.textContent = e.target.value);
+        cardCountLabel.textContent = cardCountSlider.value;
+    }
+
+    const fileCardCountSlider = document.getElementById('ai-file-card-count');
+    const fileCardCountLabel = document.getElementById('ai-file-card-count-label');
+    if (fileCardCountSlider && fileCardCountLabel) {
+        fileCardCountSlider.addEventListener('input', (e) => fileCardCountLabel.textContent = e.target.value);
+        fileCardCountLabel.textContent = fileCardCountSlider.value;
+    }
+
+    // Initialize
+    activateTab(simpleTab, simpleView);
+}
 
         function renderPublishDeckModal(deckId) {
             const modalContent = `
@@ -2634,7 +2639,95 @@ async function createUserProfile(user, username) {
                 return "A helpful collection of flashcards."; // Return a default summary on error
             }
         }
+
+        // Converts a File object to the { inlineData: { mimeType, data } } format Gemini needs
+async function fileToGenerativePart(file) {
+    const base64EncodedDataPromise = new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]); // Get only the base64 part
+        reader.readAsDataURL(file);
+    });
+
+    return {
+        inlineData: { data: await base64EncodedDataPromise, mimeType: file.type }
+    };
+}
         
+// --- NEW: Function to generate cards from an uploaded file ---
+        async function generateCardsFromFile(deckId) {
+            const fileInput = document.getElementById('ai-file-input');
+            const cardCountInput = document.getElementById('ai-file-card-count');
+            const loader = document.getElementById('file-ai-loader');
+            
+            const file = fileInput.files[0];
+            const cardCount = cardCountInput ? parseInt(cardCountInput.value, 10) : 8;
+
+            if (!file) {
+                alert("Please select a file to upload.");
+                return;
+            }
+
+            loader.classList.remove('hidden');
+            const saveButton = document.getElementById('modal-save-btn');
+            saveButton.disabled = true;
+
+            const prompt = `
+                You are an expert flashcard creator. I have uploaded a document.
+                Please analyze the document and generate a list of exactly ${cardCount} high-quality flashcards based on its content.
+                The response MUST be a valid JSON array of objects, where each object has a "question" and an "answer" key.
+                Do NOT include any other text, explanations, or markdown formatting.
+                The questions should be clear and concise. The answers should be accurate and to the point.
+            `;
+
+            try {
+                // 1. Convert the file to the format Gemini needs
+                const filePart = await fileToGenerativePart(file);
+
+                // 2. Call the Gemini API with both text prompt and file data
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        // The contents array now has two parts: the prompt and the file
+                        contents: [{ parts: [{ text: prompt }, filePart] }], 
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API error: ${response.status} - ${errorBody}`);
+                }
+
+                const result = await response.json();
+                const aiResponseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!aiResponseText) {
+                    throw new Error("The AI returned an empty response. The file might be unreadable.");
+                }
+                
+                const newCards = JSON.parse(aiResponseText);
+
+                if (Array.isArray(newCards) && newCards.length > 0) {
+                    await addMultipleCardsToDeck(deckId, newCards);
+                    document.getElementById('add-card-modal')?.remove();
+                } else {
+                    throw new Error("The AI did not return a valid array of cards.");
+                }
+
+            } catch (error) {
+                console.error("Error generating cards from file:", error);
+                alert(`Failed to generate cards. The file type might not be supported by the AI or another error occurred. Error: ${error.message}`);
+            } finally {
+                loader.classList.add('hidden');
+                saveButton.disabled = false;
+            }
+        }
+
         // --- Progress Feature Data Logic ---
         async function addProgressSubject(name) {
             try {
@@ -4013,5 +4106,3 @@ function renderQuizModal(deck) { // Renamed from renderStudySessionView for clar
     </script>
 </body>
 </html>
-
-
