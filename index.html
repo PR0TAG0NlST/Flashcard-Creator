@@ -101,7 +101,6 @@
 
         // Global variables
         let app, db, auth, storage, userId, userProfile;
-        let allUserNotes = [];
         let allUserDecks = [];
         let progressSubjects = [];
         let progressChartInstance = null;
@@ -895,12 +894,6 @@
                     <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
                         My Decks
-                    </a>
-                    <a href="#" id="nav-notes" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        Notes
                     </a>
                     <a href="#" id="nav-progress" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
@@ -3322,172 +3315,6 @@ async function fileToGenerativePart(file) {
             });
         }
 
-        // === NOTES FEATURE ===
-
-function fetchUserNotes() {
-    if (!userId) return;
-    onSnapshot(collection(db, `/artifacts/${appId}/users/${userId}/notes`), snap => {
-        allUserNotes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (document.querySelector('#main-header h1')?.textContent.includes('Notes')) {
-            renderNotesView();
-        }
-    });
-}
-
-function renderNotesView() {
-    setActiveNav('nav-notes');
-    setHeader('Notes – Upload Files');
-    const content = document.getElementById('app-content');
-
-    content.innerHTML = `
-        <div class="max-w-4xl mx-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold">Your Files</h2>
-                <label class="px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700">
-                    + Upload File
-                    <input type="file" id="notes-file-input" class="hidden" multiple>
-                </label>
-            </div>
-
-            <div id="notes-list" class="space-y-4">
-                ${allUserNotes.length ? allUserNotes.map(n => `
-                    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                            <div>
-                                <p class="font-medium">${n.fileName}</p>
-                                <p class="text-sm text-gray-500">${n.uploadedAt?.toDate?.().toLocaleString() || ''}</p>
-                            </div>
-                        </div>
-                        <div class="flex space-x-2">
-                            <a href="${n.downloadURL}" target="_blank" class="text-blue-600 hover:underline text-sm">Open</a>
-                            <button class="rename-note-btn text-sm text-gray-600 hover:underline" data-id="${n.id}">Rename</button>
-                            <button class="delete-note-btn text-sm text-red-600 hover:underline" data-id="${n.id}">Delete</button>
-                        </div>
-                    </div>`).join('') 
-                    : '<p class="text-center text-gray-500 py-8">No files yet. Upload one to get started.</p>'
-                }
-            </div>
-        </div>
-    `;
-
-    // Upload
-    const input = document.getElementById('notes-file-input');
-    input.onchange = () => {
-        if (input.files.length) uploadNotesFiles(Array.from(input.files));
-        input.value = '';
-    };
-
-    // Rename / Delete
-    content.onclick = async e => {
-        const t = e.target;
-        if (t.classList.contains('delete-note-btn')) {
-            if (confirm('Delete permanently?')) await deleteNoteFile(t.dataset.id);
-        }
-        if (t.classList.contains('rename-note-btn')) {
-            const note = allUserNotes.find(n => n.id === t.dataset.id);
-            renderRenameNoteModal(note);
-        }
-    };
-}
-
-async function uploadNotesFiles(files) {
-    const list = document.getElementById('notes-list');
-    const prog = document.createElement('div');
-    prog.id = 'upload-progress';
-    prog.className = 'text-center text-sm text-gray-600 py-2';
-    prog.textContent = 'Uploading...';
-    list.before(prog);
-
-    for (const file of files) {
-        const path = `users/${userId}/notes/${Date.now()}_${file.name}`;
-        const refStorage = ref(storage, path);
-        await uploadBytes(refStorage, file);
-        const url = await getDownloadURL(refStorage);
-
-        await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/notes`), {
-            fileName: file.name,
-            downloadURL: url,
-            uploadedAt: new Date(),
-            size: file.size
-        });
-    }
-    prog.remove();
-}
-
-async function deleteNoteFile(id) {
-    const note = allUserNotes.find(n => n.id === id);
-    if (!note) return;
-    try {
-        await deleteObject(ref(storage, note.downloadURL)).catch(() => {});
-        await deleteDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, id));
-    } catch (e) { alert('Delete failed'); }
-}
-
-function renderRenameNoteModal(note) {
-    renderModal('rename-note-modal', 'Rename File', `
-        <input type="text" id="new-name" class="mt-1 block w-full px-3 py-2 border rounded-md" value="${note.fileName}">
-    `, async () => {
-        const name = document.getElementById('new-name').value.trim();
-        if (name && name !== note.fileName) {
-            await updateDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, note.id), { fileName: name });
-            document.getElementById('rename-note-modal')?.remove();
-        }
-    }, 'Save');
-}
-
-// Add Note Modal
-function renderAddNoteModal() {
-    renderModal('add-note-modal', 'Add Note', `
-        <form id="note-form">
-            <label for="note-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
-            <input type="text" id="note-title" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-            
-            <label for="note-content" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Content</label>
-            <textarea id="note-content" rows="10" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-        </form>
-    `, async () => {
-        const title = document.getElementById('note-title').value.trim();
-        const content = document.getElementById('note-content').value.trim();
-        if (title && content) {
-            await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/notes`), {
-                title,
-                content,
-                createdAt: new Date(),
-                updatedAt: new Date()
-            });
-            document.getElementById('add-note-modal')?.remove();
-        }
-    }, 'Save Note');
-}
-
-// Edit Note Modal
-function renderEditNoteModal(note) {
-    renderModal('edit-note-modal', 'Edit Note', `
-        <form id="note-form">
-            <label for="note-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
-            <input type="text" id="note-title" value="${note.title}" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">
-            
-            <label for="note-content" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Content</label>
-            <textarea id="note-content" rows="10" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">${note.content}</textarea>
-        </form>
-    `, async () => {
-        const title = document.getElementById('note-title').value.trim();
-        const content = document.getElementById('note-content').value.trim();
-        if (title && content) {
-            await updateDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, note.id), {
-                title,
-                content,
-                updatedAt: new Date()
-            });
-            document.getElementById('edit-note-modal')?.remove();
-        }
-    }, 'Update Note');
-}
-
         function fetchProgressSubjects() {
             if (!userId) return;
             const subjectsCol = collection(db, `/artifacts/${appId}/users/${userId}/progress_subjects`);
@@ -3553,11 +3380,6 @@ function setupEventListeners() {
     document.getElementById('nav-requests').addEventListener('click', (e) => {
         e.preventDefault();
         renderRequestsView();
-    });
-
-    document.getElementById('nav-notes').addEventListener('click', (e) => {
-        e.preventDefault();
-        renderNotesView();
     });
 
     document.getElementById('sidebar-add-deck-btn').addEventListener('click', (e) => {
@@ -3667,7 +3489,6 @@ function initializeAndApplyTheme() {
                 fetchUserProfile();
                 fetchAndDisplayDecks();
                 fetchProgressSubjects();
-                fetchUserNotes();
                 listenForFollowRequests();
                 renderAppLayout(); // This will now handle the theme initialization
 
