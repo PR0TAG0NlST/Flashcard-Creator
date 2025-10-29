@@ -528,9 +528,8 @@
 
             <!-- Form Content -->
             <form id="add-card-form" class="mt-6">
-                {/* Simple Add View */}
                 <div id="simple-add-view" class="space-y-4">
-                     <div>
+                    <div>
                         <label for="card-question" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Question</label>
                         <textarea id="card-question" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
                     </div>
@@ -539,15 +538,15 @@
                         <textarea id="card-answer" rows="3" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
                     </div>
                 </div>
-                {/* Bulk Add View */}
+
                 <div id="bulk-add-view" class="hidden">
-                     <div>
+                    <div>
                         <label for="bulk-cards-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cards</label>
                         <textarea id="bulk-cards-input" rows="10" class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Question 1: Answer 1\n\nQuestion 2: Answer 2"></textarea>
                         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Separate cards with a blank line. Separate question and answer with a colon (:).</p>
                     </div>
                 </div>
-                {/* AI Add View */}
+
                 <div id="ai-add-view" class="hidden">
                     <div class="space-y-4">
                         <div>
@@ -565,10 +564,10 @@
                         </div>
                     </div>
                 </div>
-                {/* File Add View */}
+
                 <div id="file-add-view" class="hidden">
-                     <div class="space-y-4">
-                         <div>
+                    <div class="space-y-4">
+                        <div>
                             <label for="ai-file-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Upload Document</label>
                             <input type="file" id="ai-file-input" required class="mt-1 block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt">
                             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">The AI will read your file to generate flashcards.</p>
@@ -587,10 +586,9 @@
         </div>
     `;
 
-    // Render modal
     renderModal('add-card-modal', 'Add New Card(s)', modalContent, () => {}, 'Add Card(s)');
 
-    // Get elements AFTER rendering
+    // === GET ELEMENTS AFTER RENDERING ===
     const simpleTab = document.getElementById('simple-add-tab');
     const bulkTab = document.getElementById('bulk-add-tab');
     const aiTab = document.getElementById('ai-add-tab');
@@ -603,7 +601,6 @@
 
     const saveButton = document.getElementById('modal-save-btn');
 
-    // Safety check
     if (!saveButton || !simpleTab || !bulkTab || !aiTab || !fileTab || !simpleView || !bulkView || !aiView || !fileView) {
         console.error("Modal elements not found!");
         return;
@@ -623,7 +620,6 @@
         activeTab.classList.remove('text-gray-500', 'border-transparent');
         activeView.classList.remove('hidden');
 
-        // Update save button
         if (activeTab === aiTab) {
             saveButton.textContent = 'Generate Cards';
             saveButton.onclick = () => generateCardsWithAI(deckId);
@@ -665,7 +661,7 @@
         }
     }
 
-    // Attach event listeners INSIDE the function
+    // === EVENT LISTENERS (MUST BE INSIDE FUNCTION) ===
     simpleTab.addEventListener('click', () => activateTab(simpleTab, simpleView));
     bulkTab.addEventListener('click', () => activateTab(bulkTab, bulkView));
     aiTab.addEventListener('click', () => activateTab(aiTab, aiView));
@@ -899,6 +895,12 @@
                     <a href="#" id="nav-my-decks" class="flex items-center px-4 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 rounded-lg font-semibold">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h6a2 2 0 012 2v4"></path></svg>
                         My Decks
+                    </a>
+                    <a href="#" id="nav-notes" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Notes
                     </a>
                     <a href="#" id="nav-progress" class="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
@@ -3320,6 +3322,113 @@ async function fileToGenerativePart(file) {
             });
         }
 
+        // === NOTES FEATURE ===
+
+// Fetch notes from Firestore
+function fetchUserNotes() {
+    if (!userId) return;
+    const notesCol = collection(db, `/artifacts/${appId}/users/${userId}/notes`);
+    onSnapshot(notesCol, (snapshot) => {
+        allUserNotes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const header = document.querySelector('#main-header h1')?.textContent;
+        if (header === 'Notes') {
+            renderNotesView();
+        }
+    });
+}
+
+// Render Notes View
+function renderNotesView() {
+    setActiveNav('nav-notes');
+    setHeader('Notes');
+    const content = document.getElementById('app-content');
+    content.innerHTML = `
+        <div class="max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold">My Notes</h2>
+                <button id="add-note-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ Add Note</button>
+            </div>
+            <div id="notes-list" class="space-y-4">
+                ${allUserNotes.length > 0 ? allUserNotes.map(note => `
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                        <h3 class="font-medium text-lg">${note.title}</h3>
+                        <p class="text-gray-600 dark:text-gray-300 mt-2 text-sm">${note.content.substring(0, 150)}${note.content.length > 150 ? '...' : ''}</p>
+                        <div class="mt-3 flex space-x-2">
+                            <button class="edit-note-btn text-sm text-blue-600 hover:underline" data-id="${note.id}">Edit</button>
+                            <button class="delete-note-btn text-sm text-red-600 hover:underline" data-id="${note.id}">Delete</button>
+                        </div>
+                    </div>
+                `).join('') : '<p class="text-center text-gray-500 py-8">No notes yet. Click "Add Note" to start!</p>'}
+            </div>
+        </div>
+    `;
+
+    document.getElementById('add-note-btn').addEventListener('click', renderAddNoteModal);
+
+    content.addEventListener('click', async (e) => {
+        const target = e.target;
+        if (target.classList.contains('edit-note-btn')) {
+            const noteId = target.dataset.id;
+            const note = allUserNotes.find(n => n.id === noteId);
+            renderEditNoteModal(note);
+        } else if (target.classList.contains('delete-note-btn')) {
+            const noteId = target.dataset.id;
+            if (confirm('Delete this note permanently?')) {
+                await deleteDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, noteId));
+            }
+        }
+    });
+}
+
+// Add Note Modal
+function renderAddNoteModal() {
+    renderModal('add-note-modal', 'Add Note', `
+        <form id="note-form">
+            <label for="note-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+            <input type="text" id="note-title" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            
+            <label for="note-content" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Content</label>
+            <textarea id="note-content" rows="10" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+        </form>
+    `, async () => {
+        const title = document.getElementById('note-title').value.trim();
+        const content = document.getElementById('note-content').value.trim();
+        if (title && content) {
+            await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/notes`), {
+                title,
+                content,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
+            document.getElementById('add-note-modal')?.remove();
+        }
+    }, 'Save Note');
+}
+
+// Edit Note Modal
+function renderEditNoteModal(note) {
+    renderModal('edit-note-modal', 'Edit Note', `
+        <form id="note-form">
+            <label for="note-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+            <input type="text" id="note-title" value="${note.title}" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">
+            
+            <label for="note-content" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Content</label>
+            <textarea id="note-content" rows="10" required class="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">${note.content}</textarea>
+        </form>
+    `, async () => {
+        const title = document.getElementById('note-title').value.trim();
+        const content = document.getElementById('note-content').value.trim();
+        if (title && content) {
+            await updateDoc(doc(db, `/artifacts/${appId}/users/${userId}/notes`, note.id), {
+                title,
+                content,
+                updatedAt: new Date()
+            });
+            document.getElementById('edit-note-modal')?.remove();
+        }
+    }, 'Update Note');
+}
+
         function fetchProgressSubjects() {
             if (!userId) return;
             const subjectsCol = collection(db, `/artifacts/${appId}/users/${userId}/progress_subjects`);
@@ -3385,6 +3494,11 @@ function setupEventListeners() {
     document.getElementById('nav-requests').addEventListener('click', (e) => {
         e.preventDefault();
         renderRequestsView();
+    });
+
+    document.getElementById('nav-notes').addEventListener('click', (e) => {
+        e.preventDefault();
+        renderNotesView();
     });
 
     document.getElementById('sidebar-add-deck-btn').addEventListener('click', (e) => {
@@ -3494,6 +3608,7 @@ function initializeAndApplyTheme() {
                 fetchUserProfile();
                 fetchAndDisplayDecks();
                 fetchProgressSubjects();
+                fetchUserNotes();
                 listenForFollowRequests();
                 renderAppLayout(); // This will now handle the theme initialization
 
